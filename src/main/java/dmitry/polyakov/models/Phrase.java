@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.glassfish.grizzly.http.util.TimeStamp;
 
+import java.sql.Timestamp;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -14,7 +15,7 @@ import java.util.Set;
 @Data
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 @AllArgsConstructor
-@Table(name = "phrases")
+@Table(name = "phrases", schema = "telegram")
 public class Phrase {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -25,7 +26,7 @@ public class Phrase {
     private String phrase;
 
     @Column(name = "searched_date")
-    private TimeStamp searchedDate;
+    private Timestamp searchedDate;
 
     @ManyToMany(cascade = CascadeType.DETACH)
     @JoinTable(name = "users_phrases",

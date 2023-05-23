@@ -14,7 +14,7 @@ import java.util.Set;
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 @Transactional
 @AllArgsConstructor
-@Table(name = "users")
+@Table(name = "users", schema = "telegram")
 public class User {
     @Id
     @Column(name = "id")
@@ -30,7 +30,7 @@ public class User {
     @Temporal(TemporalType.TIMESTAMP)
     private Timestamp registeredDate;
 
-    @Enumerated(EnumType.ORDINAL)
+    @Enumerated(EnumType.STRING)
     @Column(name = "user_bot_state")
     private BotStateEnum userBotState;
 

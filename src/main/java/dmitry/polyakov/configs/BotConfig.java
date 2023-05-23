@@ -3,7 +3,6 @@ package dmitry.polyakov.configs;
 import dmitry.polyakov.bot.PersonalVocabularyBot;
 import dmitry.polyakov.constants.Menu;
 import dmitry.polyakov.services.BotService;
-import lombok.Data;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

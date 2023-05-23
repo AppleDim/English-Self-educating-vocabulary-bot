@@ -1,4 +1,4 @@
 package dmitry.polyakov.handlers;
 
-public class ExceptionHandler {
+public class CallbackHandler {
 }

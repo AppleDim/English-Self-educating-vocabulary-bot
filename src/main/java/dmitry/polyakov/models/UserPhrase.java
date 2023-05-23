@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 @AllArgsConstructor
-@Table(name = "users_phrases")
+@Table(name = "users_phrases", schema = "telegram")
 public class UserPhrase {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
