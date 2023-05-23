@@ -2,7 +2,6 @@ package dmitry.polyakov.bot;
 
 import dmitry.polyakov.services.BotService;
 import lombok.RequiredArgsConstructor;
-import lombok.SneakyThrows;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.objects.Update;
 
