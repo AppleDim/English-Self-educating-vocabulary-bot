@@ -5,7 +5,9 @@ import dmitry.polyakov.constants.BotStateEnum;
 import dmitry.polyakov.exceptions.UserNotFoundException;
 import dmitry.polyakov.models.Phrase;
 import dmitry.polyakov.models.User;
+import dmitry.polyakov.models.UserPhrase;
 import dmitry.polyakov.services.PhraseService;
+import dmitry.polyakov.services.UserPhraseService;
 import dmitry.polyakov.services.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +16,7 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.sql.Timestamp;
+import java.util.HashSet;
 import java.util.Set;
 
 @Component
@@ -22,12 +25,18 @@ public class MessageHandler {
     private final ChatSender chatSender;
     private final UserService userService;
     private final PhraseService phraseService;
+    private final UserPhraseService userPhraseService;
+
 
     @Autowired
-    public MessageHandler(ChatSender chatSender, UserService userService, PhraseService phraseService) {
+    public MessageHandler(ChatSender chatSender,
+                          UserService userService,
+                          PhraseService phraseService,
+                          UserPhraseService userPhraseService) {
         this.chatSender = chatSender;
         this.userService = userService;
         this.phraseService = phraseService;
+        this.userPhraseService = userPhraseService;
     }
 
     public void handleStartCommandReceived(Update update, PersonalVocabularyBot bot) {
@@ -35,6 +44,17 @@ public class MessageHandler {
             chatSender.sendMessage(update, bot, "/start");
         } catch (TelegramApiException e) {
             log.warn("An error occurred while initiating /start command\n", e);
+        }
+
+        try {
+            User user = userService.findUserById(update.getMessage().getChatId());
+            user.setUserBotState(BotStateEnum.DEFAULT_STATE);
+
+            userService.saveUser(user);
+
+        } catch (UserNotFoundException e) {
+            log.warn("An error occurred while searching for user by id = " +
+                    update.getMessage().getChatId() + "\n", e);
         }
     }
 
@@ -51,7 +71,7 @@ public class MessageHandler {
         try {
             User user = userService.findUserById(chatId);
 
-            if (user.getId().equals(chatId)) {
+            if (user.getUserId().equals(chatId)) {
                 chatSender.sendMessage(update, bot, "/show_phrases");
             }
         } catch (UserNotFoundException e) {
@@ -94,28 +114,69 @@ public class MessageHandler {
 
     public void handlePhraseReceived(Update update, PersonalVocabularyBot bot) throws UserNotFoundException {
         if (userService.isUserMatchedWithBotState(update.getMessage().getChatId(), BotStateEnum.WRITING_WORDS)) {
-            Phrase phrase = new Phrase();
-            Set<User> users = userService.getAllUsers();
+            boolean phraseFound = false;
+            if (update.getMessage().getText().matches("\\b[a-zA-Z]+(\\s+[a-zA-Z]+)*\\b")) {
+                Set<String> userTextPhrases = userPhraseService
+                        .findUserPhrasesById(update.getMessage().getChatId());
 
-            users.add(userService.findUserById(update.getMessage().getChatId()));
+                for (String userPhrase : userTextPhrases) {
+                    if (userPhrase.equals(update.getMessage().getText())) {
+                        phraseFound = true;
+                        break;
+                    }
+                }
 
-            if (phraseService.getAllPhrases().isEmpty()) {
-                phrase.setId(1L);
+                if (!phraseFound) {
+                    Phrase phrase = new Phrase();
+                    Set<User> users = new HashSet<>();
+                    User currentUser = userService.findUserById(update.getMessage().getChatId());
+
+                    users.add(currentUser);
+
+                    phrase.setUsers(users);
+                    phrase.setSearchedDate(new Timestamp(System.currentTimeMillis()));
+                    phrase.setPhrase(update.getMessage().getText());
+
+                    if (phraseService.getAllPhrases().isEmpty()) {
+                        phrase.setPhraseId(1L);
+                    } else {
+                        long maxPhraseId = phraseService.getAllPhrases().size();
+                        phrase.setPhraseId(maxPhraseId + 1);
+                    }
+
+                    phraseService.savePhrase(phrase);
+
+                    UserPhrase userPhrase = new UserPhrase();
+                    userPhrase.setUser(currentUser);
+                    userPhrase.setPhrase(phrase);
+
+                    boolean userPhraseExists = userPhraseService
+                            .findUserPhraseExists(currentUser.getUserId(), phrase.getPhraseId());
+
+                    if (!userPhraseExists) {
+                        if (userPhraseService.findAllUsersPhrases().isEmpty()) {
+                            userPhrase.setUserPhraseId(1L);
+                        } else {
+                            long maxUserPhraseId = userPhraseService.findAllUsersPhrases().size();
+                            userPhrase.setUserPhraseId(maxUserPhraseId + 1);
+                        }
+
+                        userPhraseService.saveUserPhrase(userPhrase);
+                    }
+
+                    try {
+                        chatSender.sendMessage(update, bot, "/phrase");
+                    } catch (TelegramApiException e) {
+                        log.warn("An error occurred while sending the message with chatId = " + update.getMessage().getChatId() + "\n", e);
+                    }
+                }
+
             } else {
-                long maxPhraseId = phraseService.getAllPhrases().size();
-                phrase.setId(maxPhraseId + 1);
-            }
-
-            phrase.setUsers(users);
-            phrase.setSearchedDate(new Timestamp(System.currentTimeMillis()));
-            phrase.setPhrase(update.getMessage().getText());
-
-            phraseService.savePhrase(phrase);
-
-            try {
-                chatSender.sendMessage(update, bot, "/phrase");
-            } catch (TelegramApiException e) {
-                log.warn("An error occurred while storing the given phrase from id = " + update.getMessage().getChatId() + "\n", e);
+                try {
+                    chatSender.sendMessage(update, bot, "/illegal_characters");
+                } catch (TelegramApiException e) {
+                    log.info("User tried to store a phrase with illegal characters");
+                }
             }
         }
     }
