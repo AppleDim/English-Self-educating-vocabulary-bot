@@ -14,7 +14,7 @@ CREATE SCHEMA telegram;
 
 CREATE TABLE telegram.users
 (
-    id              BIGSERIAL PRIMARY KEY,
+    user_id         BIGSERIAL PRIMARY KEY,
     first_name      VARCHAR(255) NOT NULL,
     nickname        VARCHAR(255) NOT NULL,
     registered_date TIMESTAMP    NOT NULL,
@@ -23,16 +23,16 @@ CREATE TABLE telegram.users
 
 CREATE TABLE telegram.phrases
 (
-    id            BIGSERIAL PRIMARY KEY,
+    phrase_id     BIGSERIAL PRIMARY KEY,
     phrase        VARCHAR(255) NOT NULL,
     searched_date TIMESTAMP    NOT NULL
 );
 
 CREATE TABLE telegram.users_phrases
 (
-    id        BIGSERIAL PRIMARY KEY,
-    user_id   BIGINT NOT NULL,
-    phrase_id BIGINT NOT NULL,
-    CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES telegram.users (id),
-    CONSTRAINT fk_phrase FOREIGN KEY (phrase_id) REFERENCES telegram.phrases (id)
+    users_phrases_id BIGSERIAL PRIMARY KEY,
+    user_id          BIGINT NOT NULL,
+    phrase_id        BIGINT NOT NULL,
+    CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES telegram.users (user_id),
+    CONSTRAINT fk_phrase FOREIGN KEY (phrase_id) REFERENCES telegram.phrases (phrase_id)
 );

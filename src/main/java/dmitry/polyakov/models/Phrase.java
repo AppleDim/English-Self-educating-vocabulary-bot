@@ -19,8 +19,8 @@ import java.util.Set;
 public class Phrase {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id")
-    private Long id;
+    @Column(name = "phrase_id")
+    private Long phraseId;
 
     @Column(name = "phrase")
     private String phrase;
