@@ -6,7 +6,7 @@
         <file>${HOME_LOG}</file>
 
         <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-            <fileNamePattern>root/bot/logs/app%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <fileNamePattern>logs/app%d{yyyy-MM-dd}.%i.log</fileNamePattern>
             <maxFileSize>10MB</maxFileSize>
             <totalSizeCap>1GB</totalSizeCap>
             <maxHistory>60</maxHistory>
