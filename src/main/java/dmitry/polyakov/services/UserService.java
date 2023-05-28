@@ -12,10 +12,10 @@ import java.util.Set;
 
 @Service
 public class UserService {
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
 
     @Autowired
-    public void setUserRepository(UserRepository userRepository) {
+    public UserService(UserRepository userRepository) {
         this.userRepository = userRepository;
     }
 
@@ -38,5 +38,4 @@ public class UserService {
     public void saveUser(User user) {
         userRepository.save(user);
     }
-
 }

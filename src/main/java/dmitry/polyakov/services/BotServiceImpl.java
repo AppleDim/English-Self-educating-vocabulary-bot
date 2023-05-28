@@ -1,5 +1,6 @@
 package dmitry.polyakov.services;
 
+import com.vdurmont.emoji.EmojiParser;
 import dmitry.polyakov.bot.PersonalVocabularyBot;
 import dmitry.polyakov.constants.BotStateEnum;
 import dmitry.polyakov.exceptions.UserNotFoundException;
@@ -61,7 +62,8 @@ public class BotServiceImpl implements BotService {
             userService.saveUser(user);
             commandHandler.handleDictionaryCommandReceived(update, bot);
 
-        } else if (command.equals("dictionary")
+        } else if (command.equals(EmojiParser.parseToUnicode(("dictionary")
+                + ":gb:"))
                 && user.getUserBotState().equals(BotStateEnum.DEFAULT_STATE)) {
             user.setUserBotState(BotStateEnum.READING_DICTIONARY);
             userService.saveUser(user);
@@ -78,15 +80,20 @@ public class BotServiceImpl implements BotService {
             userService.saveUser(user);
             commandHandler.handleWriteCommandReceived(update, bot);
 
-        } else if (command.equals("write")
+        } else if (command.equals(EmojiParser.parseToUnicode(("write")
+                + ":abc:"))
                 && user.getUserBotState().equals(BotStateEnum.DEFAULT_STATE)) {
             user.setUserBotState(BotStateEnum.WRITING_WORDS);
             userService.saveUser(user);
             commandHandler.handleWriteCommandReceived(update, bot);
-        }
-        else if (user.getUserBotState().equals(BotStateEnum.WRITING_WORDS)) {
-            commandHandler.handlePhraseReceived(update, bot);
 
+        } else if (user.getUserBotState().equals(BotStateEnum.WRITING_WORDS)) {
+            commandHandler.handlePhraseReceived(update, bot);
+        }
+        else if (command.equals(EmojiParser.parseToUnicode(("Back to main menu") +
+                ":x:")) && !user.getUserBotState().equals(BotStateEnum.DEFAULT_STATE)) {
+            user.setUserBotState(BotStateEnum.DEFAULT_STATE);
+            userService.saveUser(user);
         }
     }
 
