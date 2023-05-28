@@ -1,10 +1,10 @@
 package dmitry.polyakov.handlers;
 
+import com.vdurmont.emoji.EmojiParser;
 import dmitry.polyakov.bot.PersonalVocabularyBot;
 import dmitry.polyakov.constants.BotStateEnum;
-import dmitry.polyakov.models.Phrase;
 import dmitry.polyakov.models.User;
-import dmitry.polyakov.services.PhraseService;
+import dmitry.polyakov.services.UserPhraseService;
 import dmitry.polyakov.services.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,20 +15,25 @@ import org.telegram.telegrambots.meta.api.methods.send.SendVoice;
 import org.telegram.telegrambots.meta.api.objects.Chat;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.List;
 
 @Component
 @Slf4j
 public class ChatSender {
     private final UserService userService;
-    private final PhraseService phraseService;
+    private final UserPhraseService userPhraseService;
 
     @Autowired
-    public ChatSender(UserService userService, PhraseService phraseService) {
+    public ChatSender(UserService userService, UserPhraseService userPhraseService) {
         this.userService = userService;
-        this.phraseService = phraseService;
+        this.userPhraseService = userPhraseService;
     }
 
     public void sendMessage(Update update, PersonalVocabularyBot bot, String text) throws TelegramApiException {
@@ -38,11 +43,10 @@ public class ChatSender {
         sendMessage.setText(textBuilder(update, text));
         sendMessage.setChatId(String.valueOf(chatId));
         sendMessage.setParseMode(ParseMode.MARKDOWN);
-
         executeMessage(bot, sendMessage);
     }
 
-    public void sendVoiceMessage(Update update, PersonalVocabularyBot bot) throws TelegramApiException {
+    public void sendVoiceMessage(Update update, PersonalVocabularyBot bot) {
         Long chatId = update.getMessage().getChatId();
 
         SendVoice sendVoice = new SendVoice();
@@ -50,7 +54,7 @@ public class ChatSender {
         sendVoice.setChatId(String.valueOf(chatId));
         sendVoice.setParseMode(ParseMode.MARKDOWN);
 
-       executeMessage(bot, sendVoice);
+        executeMessage(bot, sendVoice);
     }
 
     private String textBuilder(Update update, String text) {
@@ -61,7 +65,7 @@ public class ChatSender {
 
                     User user = new User();
 
-                    user.setId(update.getMessage().getChatId());
+                    user.setUserId(update.getMessage().getChatId());
                     user.setFirstName(chat.getFirstName());
                     user.setNickname(chat.getUserName());
                     user.setRegisteredDate(new Timestamp(System.currentTimeMillis()));
@@ -77,17 +81,23 @@ public class ChatSender {
                 return "Here's the helping page: ";
             }
             case "/write" -> {
-                return  "Enter your words or phrase";
+                return "Enter your words or phrase";
             }
             case "/phrase" -> {
                 return "Phrase has been stored.";
             }
             case "/show_phrases" -> {
                 StringBuilder textBuilder = new StringBuilder("List of phrases:\n");
-                for (Phrase phrase : phraseService.getAllPhrases()) {
-                    textBuilder.append("__").append(phrase.getPhrase()).append("__").append("\n");
+                for (String phraseText : userPhraseService.findUserPhrasesById(update.getMessage().getChatId())) {
+                    textBuilder.append(phraseText).append("\n");
                 }
                 return textBuilder.toString();
+            }
+            case "/illegal_characters" -> {
+                return "Only latin letters are allowed.";
+            }
+            case "/phrase_already_stored" -> {
+                return "This phrase was already stored.";
             }
         }
         return "";
@@ -100,6 +110,7 @@ public class ChatSender {
             log.warn("Error occurred while trying to send a text message", e);
         }
     }
+
     public void executeMessage(PersonalVocabularyBot bot, SendVoice message) {
         try {
             bot.execute(message);
