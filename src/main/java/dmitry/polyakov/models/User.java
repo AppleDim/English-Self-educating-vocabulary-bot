@@ -36,4 +36,7 @@ public class User {
 
     @ManyToMany(mappedBy = "users", cascade = CascadeType.DETACH)
     private Set<Phrase> phrases = new HashSet<>();
+
+    @Column(name = "current_page_number")
+    private int currentPageNumber;
 }
