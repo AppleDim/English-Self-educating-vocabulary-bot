@@ -4,5 +4,6 @@ public enum BotStateEnum {
     DEFAULT_STATE,
     ASK_PHRASE,
     WRITING_WORDS,
-    READING_DICTIONARY
+    READING_DICTIONARY,
+    SETTINGS
 }
