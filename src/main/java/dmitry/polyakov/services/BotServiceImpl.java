@@ -3,100 +3,133 @@ package dmitry.polyakov.services;
 import com.vdurmont.emoji.EmojiParser;
 import dmitry.polyakov.bot.PersonalVocabularyBot;
 import dmitry.polyakov.constants.BotStateEnum;
+import dmitry.polyakov.exceptions.PhraseNotFoundException;
 import dmitry.polyakov.exceptions.UserNotFoundException;
+import dmitry.polyakov.handlers.CallbackHandler;
 import dmitry.polyakov.handlers.MessageHandler;
 import dmitry.polyakov.models.User;
-import dmitry.polyakov.repositories.PhraseRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.objects.*;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 @Slf4j
 @Service
 public class BotServiceImpl implements BotService {
-    private final PhraseRepository phraseRepository;
     private final MessageHandler commandHandler;
+    private final CallbackHandler callbackHandler;
     private final UserService userService;
 
     @Autowired
-    public BotServiceImpl(PhraseRepository phraseRepository, MessageHandler commandHandler, UserService userService) {
-        this.phraseRepository = phraseRepository;
+    public BotServiceImpl(MessageHandler commandHandler,
+                          CallbackHandler callbackHandler,
+                          UserService userService) {
         this.commandHandler = commandHandler;
+        this.callbackHandler = callbackHandler;
         this.userService = userService;
     }
 
     @Override
     public void getUpdate(Update update, PersonalVocabularyBot bot) {
-        if (update.getMessage().hasText()) {
-            String command = update.getMessage().getText();
+        if (update.hasMessage() && update.getMessage().hasText()) {
+            String text = update.getMessage().getText();
+            long chatId = update.getMessage().getChatId();
             try {
-                handleMessages(command, update, bot);
+                handleMessages(update, chatId, text, bot);
             } catch (UserNotFoundException e) {
-                log.warn("Error finding user with id = " + update.getMessage().getChatId(), e);
+                log.warn("Error finding user with id = " + chatId, e);
+            } catch (PhraseNotFoundException e) {
+                log.warn("Error fetching the phrase with this context: " + text, e);
+            } catch (TelegramApiException e) {
+                log.warn("Unexpected error has occurred while processing", e);
             }
         } else if (update.hasCallbackQuery()) {
             try {
                 handleCallback(update, bot);
             } catch (TelegramApiException e) {
                 log.warn("Unexpected error has occurred while processing", e);
+            } catch (UserNotFoundException e) {
+                log.warn("Error finding user with id = " + update.getMessage().getChatId(), e);
             }
 
         }
     }
 
-    private void handleMessages(String command, Update update, PersonalVocabularyBot bot) throws UserNotFoundException {
+    private void handleMessages(Update update, Long chatId, String command, PersonalVocabularyBot bot) throws UserNotFoundException, PhraseNotFoundException, TelegramApiException {
 
         if (command.equals("/start")) {
-            commandHandler.handleStartCommandReceived(update, bot);
+            commandHandler.handleStartCommandReceived(update, chatId, bot);
         }
 
-        User user = userService.findUserById(update.getMessage().getChatId());
+        User user = userService.findUserById(chatId);
 
         if (command.equals("/help")) {
-            commandHandler.handleHelpCommandReceived(update, bot);
+            user.setUserBotState(BotStateEnum.DEFAULT_STATE);
+            userService.saveUser(user);
+            commandHandler.handleHelpCommandReceived(update, chatId, bot);
 
         } else if (command.equals("/dictionary")) {
             user.setUserBotState(BotStateEnum.READING_DICTIONARY);
             userService.saveUser(user);
-            commandHandler.handleDictionaryCommandReceived(update, bot);
+            commandHandler.handleDictionaryCommandReceived(chatId, bot);
 
         } else if (command.equals(EmojiParser.parseToUnicode(("dictionary")
-                + ":gb:"))
+                + ":scroll:"))
                 && user.getUserBotState().equals(BotStateEnum.DEFAULT_STATE)) {
             user.setUserBotState(BotStateEnum.READING_DICTIONARY);
             userService.saveUser(user);
-            commandHandler.handleDictionaryCommandReceived(update, bot);
+            commandHandler.handleDictionaryCommandReceived(chatId, bot);
 
         } else if (command.equals("/settings")) {
-            commandHandler.handleSettingsCommandReceived(update, bot);
+            commandHandler.handleSettingsCommandReceived(update, chatId, bot);
 
         } else if (command.equals("/language")) {
-            commandHandler.handleLanguageCommandReceived(update, bot);
+            commandHandler.handleLanguageCommandReceived(update, chatId, bot);
 
         } else if (command.equals("/write")) {
             user.setUserBotState(BotStateEnum.WRITING_WORDS);
             userService.saveUser(user);
-            commandHandler.handleWriteCommandReceived(update, bot);
+            commandHandler.handleWriteCommandReceived(update, chatId, bot);
 
         } else if (command.equals(EmojiParser.parseToUnicode(("write")
-                + ":abc:"))
+                + ":writing:"))
                 && user.getUserBotState().equals(BotStateEnum.DEFAULT_STATE)) {
             user.setUserBotState(BotStateEnum.WRITING_WORDS);
             userService.saveUser(user);
-            commandHandler.handleWriteCommandReceived(update, bot);
-
-        } else if (user.getUserBotState().equals(BotStateEnum.WRITING_WORDS)) {
-            commandHandler.handlePhraseReceived(update, bot);
-        }
-        else if (command.equals(EmojiParser.parseToUnicode(("Back to main menu") +
-                ":x:")) && !user.getUserBotState().equals(BotStateEnum.DEFAULT_STATE)) {
+            commandHandler.handleWriteCommandReceived(update, chatId, bot);
+        } else if (command.equals(EmojiParser.parseToUnicode(("return")
+                + ":x:")) && !user.getUserBotState().equals(BotStateEnum.DEFAULT_STATE)) {
             user.setUserBotState(BotStateEnum.DEFAULT_STATE);
             userService.saveUser(user);
+            commandHandler.handleReturnButtonPressed(update, chatId, bot);
+        } else if (user.getUserBotState().equals(BotStateEnum.WRITING_WORDS)) {
+            commandHandler.handlePhraseReceived(update, chatId, command, bot);
         }
     }
 
-    private void handleCallback(Update update, PersonalVocabularyBot bot) throws TelegramApiException {
+    private void handleCallback(Update update, PersonalVocabularyBot bot) throws TelegramApiException, UserNotFoundException {
+        String callBackData = update.getCallbackQuery().getData();
+        long chatId = update.getCallbackQuery().getMessage().getChatId();
+        int messageId = update.getCallbackQuery().getMessage().getMessageId();
+
+        switch (callBackData) {
+            case "BACK_BUTTON" -> {
+                callbackHandler.handleBackButtonPressed(update, bot, chatId, messageId);
+            }
+
+            case "SETTINGS_BUTTON" -> {
+
+            }
+            case "CANCEL_BUTTON" -> {
+                callbackHandler.handleCancelButtonPressed(update, bot, chatId, messageId);
+            }
+
+            case "SEARCHING_BUTTON" -> {
+
+            }
+            case "FORWARD_BUTTON" -> callbackHandler.handleForwardButtonPressed(update, bot, chatId, messageId);
+        }
     }
 }

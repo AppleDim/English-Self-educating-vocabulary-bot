@@ -1,5 +1,6 @@
 package dmitry.polyakov.services;
 
+import dmitry.polyakov.models.Phrase;
 import dmitry.polyakov.models.UserPhrase;
 import dmitry.polyakov.repositories.PhraseRepository;
 import dmitry.polyakov.repositories.UserPhraseRepository;
@@ -15,6 +16,7 @@ public class UserPhraseService {
     private UserPhraseRepository userPhraseRepository;
     private UserRepository userRepository;
     private PhraseRepository phraseRepository;
+
     @Autowired
     public void setUserPhraseRepository(UserPhraseRepository userPhraseRepository,
                                         UserRepository userRepository,
@@ -24,7 +26,7 @@ public class UserPhraseService {
         this.phraseRepository = phraseRepository;
     }
 
-    public Set<String> findUserPhrasesById(Long userId) {
+    public List<String> findUserPhrasesById(Long userId) {
         return userPhraseRepository.findUserPhrasesByUserId(userId);
     }
 
@@ -38,5 +40,9 @@ public class UserPhraseService {
 
     public boolean findUserPhraseExists(Long userId, Long phraseId) {
         return userPhraseRepository.existsByUserUserIdAndPhrasePhraseId(userId, phraseId);
+    }
+
+    public int countUserPhrases(Long userId) {
+        return findUserPhrasesById(userId).size();
     }
 }
