@@ -171,4 +171,11 @@ public class MessageHandler {
             log.warn("Error finding user with id = " + chatId, e);
         }
     }
+
+    public void handleCancelButtonWhileReadingPhrasePressed(Update update, PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException {
+        User user = userService.findUserById(chatId);
+        chatSender.deleteMessage(update, bot, chatId, messageId);
+        user.setUserBotState(BotStateEnum.READING_DICTIONARY);
+        userService.saveUser(user);
+    }
 }

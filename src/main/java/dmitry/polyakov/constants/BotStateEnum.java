@@ -5,5 +5,6 @@ public enum BotStateEnum {
     ASK_PHRASE,
     WRITING_WORDS,
     READING_DICTIONARY,
-    SETTINGS
+    SETTINGS,
+    READING_WORD
 }

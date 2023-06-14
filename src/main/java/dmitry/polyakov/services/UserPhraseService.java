@@ -41,6 +41,9 @@ public class UserPhraseService {
     public boolean findUserPhraseExists(Long userId, Long phraseId) {
         return userPhraseRepository.existsByUserUserIdAndPhrasePhraseId(userId, phraseId);
     }
+    public String findSingleUserPhrase(Long userId, Long phraseId) {
+        return userPhraseRepository.findSpecificUserPhrasesByUserIdAndPhraseIds(userId, phraseId);
+    }
 
     public int countUserPhrases(Long userId) {
         return findUserPhrasesById(userId).size();

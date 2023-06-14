@@ -100,7 +100,7 @@ public class ChatSender {
         for (int i = startIndex; i < endIndex; i++) {
             sb.append(i + 1).append(". ").append("*").append(phrasesText.get(i)).append("*").append("\n");
             InlineKeyboardButton button = new InlineKeyboardButton(String.valueOf(i + 1));
-            button.setCallbackData(user.getUserId() + ": " + i + 1);
+            button.setCallbackData(user.getUserId() + ": " + phrasesText.get(i));
             currentRow.add(button);
             currentRowElements++;
 

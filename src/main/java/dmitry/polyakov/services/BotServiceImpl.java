@@ -15,6 +15,8 @@ import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage
 import org.telegram.telegrambots.meta.api.objects.*;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+import java.util.List;
+
 @Slf4j
 @Service
 public class BotServiceImpl implements BotService {
@@ -113,7 +115,7 @@ public class BotServiceImpl implements BotService {
         String callBackData = update.getCallbackQuery().getData();
         long chatId = update.getCallbackQuery().getMessage().getChatId();
         int messageId = update.getCallbackQuery().getMessage().getMessageId();
-
+        User user = userService.findUserById(chatId);
         switch (callBackData) {
             case "BACK_BUTTON" -> {
                 callbackHandler.handleBackButtonPressed(update, bot, chatId, messageId);
@@ -123,13 +125,21 @@ public class BotServiceImpl implements BotService {
 
             }
             case "CANCEL_BUTTON" -> {
-                callbackHandler.handleCancelButtonPressed(update, bot, chatId, messageId);
+                if (user.getUserBotState().equals(BotStateEnum.READING_WORD)) {
+                    commandHandler.handleCancelButtonWhileReadingPhrasePressed(update, bot, chatId, messageId);
+                    commandHandler.handleDictionaryCommandReceived(chatId, bot);
+                } else
+                    callbackHandler.handleCancelButtonPressed(update, bot, chatId, messageId);
             }
 
             case "SEARCHING_BUTTON" -> {
 
             }
             case "FORWARD_BUTTON" -> callbackHandler.handleForwardButtonPressed(update, bot, chatId, messageId);
+
+        }
+        if (callBackData.matches("[0-9]+: [a-zA-Z]+")) {
+            callbackHandler.handlePhraseNumberPressed(update, bot, chatId, messageId, callBackData);
         }
     }
 }
