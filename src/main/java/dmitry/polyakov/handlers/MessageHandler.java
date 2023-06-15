@@ -171,4 +171,26 @@ public class MessageHandler {
             log.warn("Error finding user with id = " + chatId, e);
         }
     }
+
+    public void handleCancelButtonWhileReadingPhrasePressed(Update update, PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException {
+        User user = userService.findUserById(chatId);
+        chatSender.deleteMessage(update, bot, chatId, messageId);
+        user.setUserBotState(BotStateEnum.READING_DICTIONARY);
+        userService.saveUser(user);
+    }
+
+    public void deletePhrase(Update update, PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException, TelegramApiException {
+        String phraseText = userService.getSavedPhrase(chatId);
+        Long phraseId = userPhraseService.findPhraseIdByUserIdAndPhrase(chatId, phraseText);
+        userPhraseService.deleteUserPhrase(chatId, phraseId);
+
+        List<String> phrases = userPhraseService.findUserPhrasesById(chatId);
+        phrases.remove(phraseText);
+
+        User user = userService.findUserById(chatId);
+        user.setUserBotState(BotStateEnum.READING_DICTIONARY);
+        userService.saveUser(user);
+
+        handleDictionaryCommandReceived(chatId, bot);
+    }
 }

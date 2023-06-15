@@ -1,5 +1,6 @@
 package dmitry.polyakov.handlers;
 
+import com.vdurmont.emoji.EmojiParser;
 import dmitry.polyakov.bot.PersonalVocabularyBot;
 import dmitry.polyakov.constants.BotStateEnum;
 import dmitry.polyakov.exceptions.UserNotFoundException;
@@ -7,8 +8,14 @@ import dmitry.polyakov.models.User;
 import dmitry.polyakov.services.UserPhraseService;
 import dmitry.polyakov.services.UserService;
 import org.springframework.stereotype.Component;
+import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Component
 public class CallbackHandler {
@@ -45,12 +52,20 @@ public class CallbackHandler {
         chatSender.getPhrasesFromPage(bot, chatId);
     }
 
-    public void handleCancelButtonPressed(Update update, PersonalVocabularyBot bot, long chatId, int messageId) throws UserNotFoundException, TelegramApiException {
+    public void handleCancelButtonPressed(Update update, PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException, TelegramApiException {
         User user = userService.findUserById(chatId);
         user.setUserBotState(BotStateEnum.DEFAULT_STATE);
         chatSender.deleteMessage(update, bot, chatId, messageId);
         userService.saveUser(user);
         chatSender.sendMessage(update, chatId, bot, "/return_to_main_menu");
+    }
+
+    public void handleNOButtonPressed(Update update, PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException, TelegramApiException {
+        User user = userService.findUserById(chatId);
+        user.setUserBotState(BotStateEnum.READING_DICTIONARY);
+        chatSender.deleteMessage(update, bot, chatId, messageId);
+        userService.saveUser(user);
+        chatSender.sendMessage(update, chatId, bot, "/return_to_dictionary");
     }
 
     public void handleSearchingButtonPressed(Update update, PersonalVocabularyBot bot, long chatId) throws UserNotFoundException {
@@ -60,21 +75,88 @@ public class CallbackHandler {
         chatSender.getPhrasesFromPage(bot, chatId);
     }
 
-    public void handleForwardButtonPressed(Update update, PersonalVocabularyBot bot, long chatId, int messageId) throws UserNotFoundException {
+    public void handleForwardButtonPressed(Update update, PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException {
         chatSender.deleteMessage(update, bot, chatId, messageId);
         User user = userService.findUserById(chatId);
-        int maxPage = userPhraseService.countUserPhrases(chatId) / 10;
+        int maxPage = (int) Math.ceil((double) userPhraseService.countUserPhrases(chatId) / 10);
         int currentPage = user.getCurrentPageNumber();
-
-        if (currentPage < maxPage) {
+        if (currentPage < maxPage - 1) {
             user.setCurrentPageNumber(currentPage + 1);
         } else {
-            user.setCurrentPageNumber(maxPage);
+            user.setCurrentPageNumber(maxPage - 1);
         }
 
         userService.saveUser(user);
 
         chatSender.getPhrasesFromPage(bot, chatId);
+    }
 
+
+    public void handlePhraseNumberPressed(Update update, PersonalVocabularyBot bot, Long chatId, int messageId, String callBackData) throws UserNotFoundException {
+        chatSender.deleteMessage(update, bot, chatId, messageId);
+        User user = userService.findUserById(chatId);
+        user.setUserBotState(BotStateEnum.READING_WORD);
+        List<String> phrasesText = userPhraseService.findUserPhrasesById(chatId);
+        for (String s : phrasesText) {
+            if (callBackData.split(": ")[0].equals(String.valueOf(user.getUserId()))
+                    && callBackData.split(": ")[1].equals(s)) {
+
+                InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
+                List<List<InlineKeyboardButton>> inlineKeyboard = new ArrayList<>();
+                List<InlineKeyboardButton> row = new ArrayList<>();
+
+                InlineKeyboardButton cancelButton = new InlineKeyboardButton();
+                cancelButton.setText(EmojiParser.parseToUnicode(":house:"));
+                cancelButton.setCallbackData("CANCEL_BUTTON");
+
+                InlineKeyboardButton deleteButton = new InlineKeyboardButton();
+                deleteButton.setText(EmojiParser.parseToUnicode(":x:"));
+                deleteButton.setCallbackData("DELETE_BUTTON");
+
+                row.add(deleteButton);
+                row.add(cancelButton);
+
+                inlineKeyboard.add(row);
+                inlineKeyboardMarkup.setKeyboard(inlineKeyboard);
+
+                SendMessage sendMessage = new SendMessage();
+                sendMessage.setChatId(String.valueOf(chatId));
+                sendMessage.setText("Chosen phrase:\n" + callBackData.split(": ")[1]);
+                sendMessage.setReplyMarkup(inlineKeyboardMarkup);
+
+                chatSender.executeMessage(bot, sendMessage);
+
+                user.setCurrentPhrase(callBackData.split(": ")[1]);
+                userService.saveUser(user);
+                break;
+            }
+        }
+    }
+
+    public void handleDeletePhraseButtonPressed(Update update, PersonalVocabularyBot bot, Long chatId, int messageId) {
+        chatSender.deleteMessage(update, bot, chatId, messageId);
+        SendMessage sendMessage = new SendMessage();
+        sendMessage.setChatId(String.valueOf(chatId));
+        sendMessage.setText("Confirm deleting the phrase");
+        InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> inlineKeyboard = new ArrayList<>();
+        List<InlineKeyboardButton> currentRow = new ArrayList<>();
+
+        InlineKeyboardButton yesButton = new InlineKeyboardButton();
+        yesButton.setText(EmojiParser.parseToUnicode(":heavy_check_mark:"));
+        yesButton.setCallbackData("YES_BUTTON");
+
+        InlineKeyboardButton noButton = new InlineKeyboardButton();
+        noButton.setText(EmojiParser.parseToUnicode(":x:"));
+        noButton.setCallbackData("NO_BUTTON");
+
+        currentRow.add(yesButton);
+        currentRow.add(noButton);
+
+        inlineKeyboard.add(currentRow);
+        inlineKeyboardMarkup.setKeyboard(inlineKeyboard);
+
+        sendMessage.setReplyMarkup(inlineKeyboardMarkup);
+        chatSender.executeMessage(bot, sendMessage);
     }
 }
