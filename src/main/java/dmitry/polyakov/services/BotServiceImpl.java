@@ -102,7 +102,7 @@ public class BotServiceImpl implements BotService {
             userService.saveUser(user);
             commandHandler.handleWriteCommandReceived(update, chatId, bot);
         } else if (command.equals(EmojiParser.parseToUnicode(("return")
-                + ":x:")) && !user.getUserBotState().equals(BotStateEnum.DEFAULT_STATE)) {
+                + ":house:")) && !user.getUserBotState().equals(BotStateEnum.DEFAULT_STATE)) {
             user.setUserBotState(BotStateEnum.DEFAULT_STATE);
             userService.saveUser(user);
             commandHandler.handleReturnButtonPressed(update, chatId, bot);
@@ -137,8 +137,19 @@ public class BotServiceImpl implements BotService {
             }
             case "FORWARD_BUTTON" -> callbackHandler.handleForwardButtonPressed(update, bot, chatId, messageId);
 
+            case "DELETE_BUTTON" -> {
+                callbackHandler.handleDeletePhraseButtonPressed(update, bot, chatId, messageId);
+            }
+            case "YES_BUTTON" -> {
+                commandHandler.deletePhrase(update, bot, chatId, messageId);
+                callbackHandler.handlePhraseNumberPressed(update, bot, chatId, messageId, callBackData);
+
+            } case "NO_BUTTON" -> {
+                callbackHandler.handleNOButtonPressed(update, bot, chatId, messageId);
+            }
+
         }
-        if (callBackData.matches("[0-9]+: [a-zA-Z]+")) {
+        if (callBackData.matches("[0-9]+: [a-zA-Z'\\-, ]+")) {
             callbackHandler.handlePhraseNumberPressed(update, bot, chatId, messageId, callBackData);
         }
     }

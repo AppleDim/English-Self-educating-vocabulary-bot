@@ -39,4 +39,7 @@ public class User {
 
     @Column(name = "current_page_number")
     private int currentPageNumber;
+
+    @Column(name = "current_phrase")
+    private String currentPhrase;
 }

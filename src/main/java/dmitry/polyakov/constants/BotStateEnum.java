@@ -6,5 +6,6 @@ public enum BotStateEnum {
     WRITING_WORDS,
     READING_DICTIONARY,
     SETTINGS,
-    READING_WORD
+    READING_WORD,
+    CONFIRM_REMOVAL
 }

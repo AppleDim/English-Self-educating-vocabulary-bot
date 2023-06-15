@@ -4,6 +4,7 @@ import dmitry.polyakov.constants.BotStateEnum;
 import dmitry.polyakov.exceptions.UserNotFoundException;
 import dmitry.polyakov.models.User;
 import dmitry.polyakov.repositories.UserRepository;
+import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -44,12 +45,26 @@ public class UserService {
         Optional<User> userOptional = userRepository.findById(chatId);
         return userOptional.map(User::getCurrentPageNumber).orElse(0);
     }
+    public String getSavedPhrase(Long chatId) {
+        Optional<User> userOptional = userRepository.findById(chatId);
+        return userOptional.map(User::getCurrentPhrase).orElse("");
+    }
 
     public void setCurrentPageNumber(Long chatId, int currentPageNumber) {
         Optional<User> userOptional = userRepository.findById(chatId);
         if (userOptional.isPresent()) {
             User user = userOptional.get();
             user.setCurrentPageNumber(currentPageNumber);
+            userRepository.save(user);
+        }
+    }
+
+    @Transactional
+    public void setUserCurrentPhrase(Long chatId, String currentPhrase) {
+        Optional<User> userOptional = userRepository.findById(chatId);
+        if (userOptional.isPresent()) {
+            User user = userOptional.get();
+            user.setCurrentPhrase(currentPhrase);
             userRepository.save(user);
         }
     }

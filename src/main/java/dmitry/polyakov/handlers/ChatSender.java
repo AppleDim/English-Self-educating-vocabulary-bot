@@ -71,7 +71,7 @@ public class ChatSender {
 
     public void deleteMessage(Update update, PersonalVocabularyBot bot, long chatId, int messageId) {
         DeleteMessage deleteMessage = new DeleteMessage();
-        deleteMessage.setChatId(update.getCallbackQuery().getId());
+        deleteMessage.setChatId(String.valueOf(chatId));
         deleteMessage.setMessageId(messageId);
         deleteMessage.setChatId(String.valueOf(chatId));
         executeMessage(bot, deleteMessage);
@@ -87,7 +87,8 @@ public class ChatSender {
         int currentRowElements = 0;
 
         int startIndex = page * pageSize;
-        int endIndex = Math.min(startIndex + pageSize, phrasesText.size()); // Исправленное значение endIndex
+        int endIndex = Math.min(startIndex + pageSize, phrasesText.size());
+
         InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> inlineKeyboard = new ArrayList<>();
         putGeneralButtons(inlineKeyboard);
@@ -97,6 +98,7 @@ public class ChatSender {
         sb.append(EmojiParser.parseToUnicode(":page_facing_up:"))
                 .append("Page ").append(page + 1).append(":\n")
                 .append("-----------------------------------------\n");
+
         for (int i = startIndex; i < endIndex; i++) {
             sb.append(i + 1).append(". ").append("*").append(phrasesText.get(i)).append("*").append("\n");
             InlineKeyboardButton button = new InlineKeyboardButton(String.valueOf(i + 1));
@@ -168,6 +170,9 @@ public class ChatSender {
             case "/return_to_main_menu" -> {
                 return "Moving back... Press the button.";
             }
+            case "return_to_dictionary" -> {
+                return "Moving back to the dictionary...";
+            }
         }
         return "";
     }
@@ -222,7 +227,7 @@ public class ChatSender {
     private KeyboardRow createReturnToMenuRow() {
         KeyboardRow row = new KeyboardRow();
         String buttonText = EmojiParser.parseToUnicode(("return")
-                + ":x:");
+                + ":house:");
         KeyboardButton returnButton = new KeyboardButton(buttonText);
 
         row.add(returnButton);
@@ -241,7 +246,7 @@ public class ChatSender {
         settingsButton.setCallbackData("SETTINGS_BUTTON");
 
         InlineKeyboardButton cancelButton = new InlineKeyboardButton();
-        cancelButton.setText(EmojiParser.parseToUnicode(":x:"));
+        cancelButton.setText(EmojiParser.parseToUnicode(":house:"));
         cancelButton.setCallbackData("CANCEL_BUTTON");
 
         InlineKeyboardButton searchingButton = new InlineKeyboardButton();
