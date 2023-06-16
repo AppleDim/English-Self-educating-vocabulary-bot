@@ -86,100 +86,32 @@ public class MessageHandler {
         log.info("@" + userService.findUserById(chatId).getNickname() + " executed /write command.");
     }
 
-    public void handlePhraseReceived(Update update, Long chatId, String text, PersonalVocabularyBot bot) throws UserNotFoundException, PhraseNotFoundException {
-        if (userService.isUserMatchedWithBotState(chatId, BotStateEnum.WRITING_WORDS)) {
-            boolean phraseFound = false;
-            if (text.matches("(?:[a-zA-Z']+(?:[-'][a-zA-Z]+)*,?\\s?)+[a-zA-Z']+")) {
-                List<String> userTextPhrases = userPhraseService
-                        .findUserPhrasesById(chatId);
-
-                for (String userPhrase : userTextPhrases) {
-                    if (userPhrase.equalsIgnoreCase(text)) {
-                        executeSendingMessage(update, chatId, bot, "/phrase_already_stored");
-                        phraseFound = true;
-
-                        log.info("@" + userService.findUserById(chatId).getNickname() + " tried to save the phrase that already is saved.");
-                        break;
-
-                    }
-                }
-
-                if (!phraseFound) {
-                    Phrase phrase = new Phrase();
-
-                    Set<User> users = new HashSet<>();
-                    User currentUser = userService.findUserById(chatId);
-
-                    users.add(currentUser);
-
-                    phrase.setUsers(users);
-                    phrase.setSearchedDate(new Timestamp(System.currentTimeMillis()));
-                    phrase.setPhrase(text);
-
-                    if (phraseService.getAllPhrases().isEmpty()) {
-                        phrase.setPhraseId(1L);
-                    } else {
-                        long maxPhraseId = phraseService.getAllPhrases().size();
-                        phrase.setPhraseId(maxPhraseId + 1);
-                    }
-
-                    log.info("@" + userService.findUserById(currentUser.getUserId()).getNickname() + " saved their phrase: " + phrase.getPhrase());
-                    phraseService.savePhrase(phrase);
-
-                    UserPhrase userPhrase = new UserPhrase();
-                    userPhrase.setUser(currentUser);
-                    userPhrase.setPhrase(phrase);
-
-                    boolean userPhraseExists = userPhraseService
-                            .findUserPhraseExists(currentUser.getUserId(), phrase.getPhraseId());
-
-                    if (!userPhraseExists) {
-                        if (userPhraseService.findAllUsersPhrases().isEmpty()) {
-                            userPhrase.setUserPhraseId(1L);
-                        } else {
-                            long maxUserPhraseId = userPhraseService.findAllUsersPhrases().size();
-                            userPhrase.setUserPhraseId(maxUserPhraseId + 1);
-                        }
-
-                        userPhraseService.saveUserPhrase(userPhrase);
-                        log.info("@" + userService.findUserById(currentUser.getUserId()).getNickname() + " saved their phrase");
-                    }
-
-                    executeSendingMessage(update, chatId, bot, "/phrase");
-                }
-            }  else {
-                executeSendingMessage(update, chatId, bot, "/illegal_characters");
-
-                log.warn("@" + userService.findUserById(chatId).getNickname() + " tried to find a phrase with illegal characters");
-            }
-        }
-    }
-
     public void handleReturnButtonPressed (Update update, Long chatId, PersonalVocabularyBot bot) throws UserNotFoundException {
         executeSendingMessage(update, chatId, bot, "/return_to_main_menu");
 
         log.info("@" + userService.findUserById(chatId).getNickname() + " returned to the main menu");
-
     }
 
-    public void executeSendingMessage(Update update, Long chatId, PersonalVocabularyBot bot, String text) {
-        try {
-            chatSender.sendMessage(update, chatId, bot, text);
-        } catch (TelegramApiException e) {
-            log.warn("An error occurred while sending the message with chatId = " + chatId + "\n", e);
-        } catch (UserNotFoundException e) {
-            log.warn("Error finding user with id = " + chatId, e);
+    public void handleCancelButtonWhileReadingPhrasePressed(PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException {
+        User user = userService.findUserById(chatId);
+        chatSender.deleteMessage(bot, chatId, messageId);
+        user.setUserBotState(BotStateEnum.READING_DICTIONARY);
+        userService.saveUser(user);
+
+        log.info("@" + userService.findUserById(chatId).getNickname() + " returned their dictionary page");
+    }
+
+    public void handlePhraseReceived(Update update, Long chatId, String text, PersonalVocabularyBot bot) throws UserNotFoundException, PhraseNotFoundException {
+        if (userService.isUserMatchedWithBotState(chatId, BotStateEnum.WRITING_WORDS)) {
+            if (text.matches("(?:[a-zA-Z']+(?:[-'][a-zA-Z]+)*,?\\s?)+[a-zA-Z']+")) {
+                handleValidPhrase(update, chatId, text, bot);
+            } else {
+                handleInvalidPhrase(update, chatId, bot);
+            }
         }
     }
 
-    public void handleCancelButtonWhileReadingPhrasePressed(Update update, PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException {
-        User user = userService.findUserById(chatId);
-        chatSender.deleteMessage(update, bot, chatId, messageId);
-        user.setUserBotState(BotStateEnum.READING_DICTIONARY);
-        userService.saveUser(user);
-    }
-
-    public void deletePhrase(Update update, PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException, TelegramApiException {
+    public void deletePhrase(PersonalVocabularyBot bot, Long chatId) throws UserNotFoundException, TelegramApiException {
         String phraseText = userService.getSavedPhrase(chatId);
         Long phraseId = userPhraseService.findPhraseIdByUserIdAndPhrase(chatId, phraseText);
         userPhraseService.deleteUserPhrase(chatId, phraseId);
@@ -192,5 +124,89 @@ public class MessageHandler {
         userService.saveUser(user);
 
         handleDictionaryCommandReceived(chatId, bot);
+    }
+
+    private void executeSendingMessage(Update update, Long chatId, PersonalVocabularyBot bot, String text) {
+        try {
+            chatSender.sendMessage(update, chatId, bot, text);
+        } catch (TelegramApiException e) {
+            log.warn("An error occurred while sending the message with chatId = " + chatId + "\n", e);
+        } catch (UserNotFoundException e) {
+            log.warn("Error finding user with id = " + chatId, e);
+        }
+    }
+
+    private void handleValidPhrase(Update update, Long chatId, String text, PersonalVocabularyBot bot) throws UserNotFoundException {
+        List<String> userTextPhrases = userPhraseService.findUserPhrasesById(chatId);
+        boolean phraseFound = false;
+
+        for (String userPhrase : userTextPhrases) {
+            if (userPhrase.equalsIgnoreCase(text)) {
+                executeSendingMessage(update, chatId, bot, "/phrase_already_stored");
+                phraseFound = true;
+
+                log.info("@" + userService.findUserById(chatId).getNickname() + " tried to save the phrase that already is saved.");
+                break;
+            }
+        }
+
+        if (!phraseFound) {
+            Phrase phrase = getPhraseFromUser(chatId, text);
+            saveUserPhrase(chatId, phrase);
+
+            executeSendingMessage(update, chatId, bot, "/phrase");
+        }
+    }
+
+    private void handleInvalidPhrase(Update update, Long chatId, PersonalVocabularyBot bot) throws UserNotFoundException {
+        executeSendingMessage(update, chatId, bot, "/illegal_characters");
+        log.warn("@" + userService.findUserById(chatId).getNickname() + " tried to find a phrase with illegal characters");
+    }
+
+    private Phrase getPhraseFromUser(Long chatId, String text) throws UserNotFoundException {
+        Phrase phrase = new Phrase();
+        User currentUser = userService.findUserById(chatId);
+
+        Set<User> users = new HashSet<>();
+        users.add(currentUser);
+
+        phrase.setUsers(users);
+        phrase.setSearchedDate(new Timestamp(System.currentTimeMillis()));
+        phrase.setPhrase(text);
+
+        if (phraseService.getAllPhrases().isEmpty()) {
+            phrase.setPhraseId(1L);
+        } else {
+            long maxPhraseId = phraseService.getAllPhrases().size();
+            phrase.setPhraseId(maxPhraseId + 1);
+        }
+
+        log.info("@" + userService.findUserById(currentUser.getUserId()).getNickname() + " saved their phrase: " + phrase.getPhrase());
+        phraseService.savePhrase(phrase);
+
+        return phrase;
+    }
+
+    private void saveUserPhrase(Long chatId, Phrase phrase) throws UserNotFoundException {
+        User currentUser = userService.findUserById(chatId);
+
+        UserPhrase userPhrase = new UserPhrase();
+        userPhrase.setUser(currentUser);
+        userPhrase.setPhrase(phrase);
+
+        boolean userPhraseExists = userPhraseService.findUserPhraseExists(currentUser.getUserId(), phrase.getPhraseId());
+
+        if (!userPhraseExists) {
+            if (userPhraseService.findAllUsersPhrases().isEmpty()) {
+                userPhrase.setUserPhraseId(1L);
+            } else {
+                long maxUserPhraseId = userPhraseService.findAllUsersPhrases().size();
+                userPhrase.setUserPhraseId(maxUserPhraseId + 1);
+            }
+
+            userPhraseService.saveUserPhrase(userPhrase);
+
+            log.info("@" + userService.findUserById(currentUser.getUserId()).getNickname() + " saved their phrase");
+        }
     }
 }

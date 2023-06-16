@@ -1,41 +1,44 @@
 package dmitry.polyakov.handlers;
 
-import com.vdurmont.emoji.EmojiParser;
 import dmitry.polyakov.bot.PersonalVocabularyBot;
 import dmitry.polyakov.constants.BotStateEnum;
 import dmitry.polyakov.exceptions.UserNotFoundException;
 import dmitry.polyakov.models.User;
 import dmitry.polyakov.services.UserPhraseService;
 import dmitry.polyakov.services.UserService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @Component
+@Slf4j
 public class CallbackHandler {
     private final UserService userService;
     private final UserPhraseService userPhraseService;
     private final ChatSender chatSender;
+    private final InlineKeyboardFactory inlineKeyboardFactory;
     public CallbackHandler(UserService userService,
                            UserPhraseService userPhraseService,
-                           ChatSender chatSender) {
+                           ChatSender chatSender,
+                           InlineKeyboardFactory inlineKeyboardFactory) {
         this.userService = userService;
         this.userPhraseService = userPhraseService;
         this.chatSender = chatSender;
+        this.inlineKeyboardFactory = inlineKeyboardFactory;
     }
 
-    public void handleBackButtonPressed(Update update, PersonalVocabularyBot bot, long chatId, int messageId) throws UserNotFoundException {
-        chatSender.deleteMessage(update, bot, chatId, messageId);
+    public void handleBackButtonPressed(PersonalVocabularyBot bot, long chatId, int messageId) throws UserNotFoundException {
+        chatSender.deleteMessage(bot, chatId, messageId);
         User user = userService.findUserById(chatId);
+        int currentPage = user.getCurrentPageNumber();
+
         if (user.getCurrentPageNumber() > 0) {
-            int page = user.getCurrentPageNumber();
-            user.setCurrentPageNumber(--page);
+            user.setCurrentPageNumber(--currentPage);
         } else {
             user.setCurrentPageNumber(0);
         }
@@ -43,6 +46,8 @@ public class CallbackHandler {
         userService.saveUser(user);
 
         chatSender.getPhrasesFromPage(bot, chatId);
+
+        log.info("@" + userService.findUserById(chatId).getNickname() + " scrolled to the next page: " + currentPage);
     }
 
     public void handleSettingsButtonPressed(Update update, PersonalVocabularyBot bot, long chatId) throws UserNotFoundException {
@@ -55,28 +60,15 @@ public class CallbackHandler {
     public void handleCancelButtonPressed(Update update, PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException, TelegramApiException {
         User user = userService.findUserById(chatId);
         user.setUserBotState(BotStateEnum.DEFAULT_STATE);
-        chatSender.deleteMessage(update, bot, chatId, messageId);
+        chatSender.deleteMessage(bot, chatId, messageId);
         userService.saveUser(user);
         chatSender.sendMessage(update, chatId, bot, "/return_to_main_menu");
+
+        log.info("@" + userService.findUserById(chatId).getNickname() + " returned to the main");
     }
 
-    public void handleNOButtonPressed(Update update, PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException, TelegramApiException {
-        User user = userService.findUserById(chatId);
-        user.setUserBotState(BotStateEnum.READING_DICTIONARY);
-        chatSender.deleteMessage(update, bot, chatId, messageId);
-        userService.saveUser(user);
-        chatSender.sendMessage(update, chatId, bot, "/return_to_dictionary");
-    }
-
-    public void handleSearchingButtonPressed(Update update, PersonalVocabularyBot bot, long chatId) throws UserNotFoundException {
-        User user = userService.findUserById(chatId);
-        user.setUserBotState(BotStateEnum.SETTINGS);
-        userService.saveUser(user);
-        chatSender.getPhrasesFromPage(bot, chatId);
-    }
-
-    public void handleForwardButtonPressed(Update update, PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException {
-        chatSender.deleteMessage(update, bot, chatId, messageId);
+    public void handleForwardButtonPressed(PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException {
+        chatSender.deleteMessage(bot, chatId, messageId);
         User user = userService.findUserById(chatId);
         int maxPage = (int) Math.ceil((double) userPhraseService.countUserPhrases(chatId) / 10);
         int currentPage = user.getCurrentPageNumber();
@@ -89,74 +81,52 @@ public class CallbackHandler {
         userService.saveUser(user);
 
         chatSender.getPhrasesFromPage(bot, chatId);
+
+        log.info("@" + userService.findUserById(chatId).getNickname() + " scrolled to the next page: " + currentPage);
+    }
+
+    public void handleSearchingButtonPressed(Update update, PersonalVocabularyBot bot, long chatId) throws UserNotFoundException {
+        User user = userService.findUserById(chatId);
+        user.setUserBotState(BotStateEnum.SETTINGS);
+        userService.saveUser(user);
+        chatSender.getPhrasesFromPage(bot, chatId);
     }
 
 
-    public void handlePhraseNumberPressed(Update update, PersonalVocabularyBot bot, Long chatId, int messageId, String callBackData) throws UserNotFoundException {
-        chatSender.deleteMessage(update, bot, chatId, messageId);
+    public void handlePhraseNumberPressed(PersonalVocabularyBot bot, Long chatId, int messageId, String callBackData) throws UserNotFoundException {
+        chatSender.deleteMessage(bot, chatId, messageId);
         User user = userService.findUserById(chatId);
         user.setUserBotState(BotStateEnum.READING_WORD);
         List<String> phrasesText = userPhraseService.findUserPhrasesById(chatId);
-        for (String s : phrasesText) {
-            if (callBackData.split(": ")[0].equals(String.valueOf(user.getUserId()))
-                    && callBackData.split(": ")[1].equals(s)) {
-
-                InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
-                List<List<InlineKeyboardButton>> inlineKeyboard = new ArrayList<>();
-                List<InlineKeyboardButton> row = new ArrayList<>();
-
-                InlineKeyboardButton cancelButton = new InlineKeyboardButton();
-                cancelButton.setText(EmojiParser.parseToUnicode(":house:"));
-                cancelButton.setCallbackData("CANCEL_BUTTON");
-
-                InlineKeyboardButton deleteButton = new InlineKeyboardButton();
-                deleteButton.setText(EmojiParser.parseToUnicode(":x:"));
-                deleteButton.setCallbackData("DELETE_BUTTON");
-
-                row.add(deleteButton);
-                row.add(cancelButton);
-
-                inlineKeyboard.add(row);
-                inlineKeyboardMarkup.setKeyboard(inlineKeyboard);
-
-                SendMessage sendMessage = new SendMessage();
-                sendMessage.setChatId(String.valueOf(chatId));
-                sendMessage.setText("Chosen phrase:\n" + callBackData.split(": ")[1]);
+        for (String str : phrasesText) {
+            if (isChosenPhrase(callBackData, user, str)) {
+                InlineKeyboardMarkup inlineKeyboardMarkup = inlineKeyboardFactory.createDeletePageInlineKeyboardMarkup();
+                SendMessage sendMessage = chatSender.createPhraseWatchingPage(chatId, callBackData);
                 sendMessage.setReplyMarkup(inlineKeyboardMarkup);
-
                 chatSender.executeMessage(bot, sendMessage);
-
-                user.setCurrentPhrase(callBackData.split(": ")[1]);
-                userService.saveUser(user);
                 break;
             }
         }
     }
 
-    public void handleDeletePhraseButtonPressed(Update update, PersonalVocabularyBot bot, Long chatId, int messageId) {
-        chatSender.deleteMessage(update, bot, chatId, messageId);
-        SendMessage sendMessage = new SendMessage();
-        sendMessage.setChatId(String.valueOf(chatId));
-        sendMessage.setText("Confirm deleting the phrase");
-        InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
-        List<List<InlineKeyboardButton>> inlineKeyboard = new ArrayList<>();
-        List<InlineKeyboardButton> currentRow = new ArrayList<>();
-
-        InlineKeyboardButton yesButton = new InlineKeyboardButton();
-        yesButton.setText(EmojiParser.parseToUnicode(":heavy_check_mark:"));
-        yesButton.setCallbackData("YES_BUTTON");
-
-        InlineKeyboardButton noButton = new InlineKeyboardButton();
-        noButton.setText(EmojiParser.parseToUnicode(":x:"));
-        noButton.setCallbackData("NO_BUTTON");
-
-        currentRow.add(yesButton);
-        currentRow.add(noButton);
-
-        inlineKeyboard.add(currentRow);
-        inlineKeyboardMarkup.setKeyboard(inlineKeyboard);
-
-        sendMessage.setReplyMarkup(inlineKeyboardMarkup);
+    public void handleDeletePhraseButtonPressed(PersonalVocabularyBot bot, Long chatId, int messageId) {
+        chatSender.deleteMessage(bot, chatId, messageId);
+        SendMessage sendMessage = chatSender.createDeleteConfirmationMessage(chatId);
         chatSender.executeMessage(bot, sendMessage);
+    }
+
+    public void handleNOButtonPressed(PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException {
+        chatSender.getPhrasesFromPage(bot, chatId);
+        User user = userService.findUserById(chatId);
+        user.setUserBotState(BotStateEnum.READING_DICTIONARY);
+        chatSender.deleteMessage(bot, chatId, messageId);
+        userService.saveUser(user);
+
+        log.info("@" + userService.findUserById(chatId).getNickname() + " canceled delete of phrase");
+    }
+
+    private boolean isChosenPhrase(String callBackData, User user, String phrase) {
+        return callBackData.split(": ")[0].equals(String.valueOf(user.getUserId()))
+                && callBackData.split(": ")[1].equals(phrase);
     }
 }
