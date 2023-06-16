@@ -11,11 +11,8 @@ import dmitry.polyakov.models.User;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.objects.*;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
-
-import java.util.List;
 
 @Slf4j
 @Service
@@ -118,7 +115,7 @@ public class BotServiceImpl implements BotService {
         User user = userService.findUserById(chatId);
         switch (callBackData) {
             case "BACK_BUTTON" -> {
-                callbackHandler.handleBackButtonPressed(update, bot, chatId, messageId);
+                callbackHandler.handleBackButtonPressed(bot, chatId, messageId);
             }
 
             case "SETTINGS_BUTTON" -> {
@@ -126,7 +123,7 @@ public class BotServiceImpl implements BotService {
             }
             case "CANCEL_BUTTON" -> {
                 if (user.getUserBotState().equals(BotStateEnum.READING_WORD)) {
-                    commandHandler.handleCancelButtonWhileReadingPhrasePressed(update, bot, chatId, messageId);
+                    commandHandler.handleCancelButtonWhileReadingPhrasePressed(bot, chatId, messageId);
                     commandHandler.handleDictionaryCommandReceived(chatId, bot);
                 } else
                     callbackHandler.handleCancelButtonPressed(update, bot, chatId, messageId);
@@ -135,22 +132,22 @@ public class BotServiceImpl implements BotService {
             case "SEARCHING_BUTTON" -> {
 
             }
-            case "FORWARD_BUTTON" -> callbackHandler.handleForwardButtonPressed(update, bot, chatId, messageId);
+            case "FORWARD_BUTTON" -> callbackHandler.handleForwardButtonPressed(bot, chatId, messageId);
 
             case "DELETE_BUTTON" -> {
-                callbackHandler.handleDeletePhraseButtonPressed(update, bot, chatId, messageId);
+                callbackHandler.handleDeletePhraseButtonPressed(bot, chatId, messageId);
             }
             case "YES_BUTTON" -> {
-                commandHandler.deletePhrase(update, bot, chatId, messageId);
-                callbackHandler.handlePhraseNumberPressed(update, bot, chatId, messageId, callBackData);
+                commandHandler.deletePhrase(bot, chatId);
+                callbackHandler.handlePhraseNumberPressed(bot, chatId, messageId, callBackData);
 
             } case "NO_BUTTON" -> {
-                callbackHandler.handleNOButtonPressed(update, bot, chatId, messageId);
+                callbackHandler.handleNOButtonPressed(bot, chatId, messageId);
             }
 
         }
         if (callBackData.matches("[0-9]+: [a-zA-Z'\\-, ]+")) {
-            callbackHandler.handlePhraseNumberPressed(update, bot, chatId, messageId, callBackData);
+            callbackHandler.handlePhraseNumberPressed(bot, chatId, messageId, callBackData);
         }
     }
 }

@@ -20,13 +20,9 @@ import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.sql.Timestamp;
-import java.util.ArrayList;
 import java.util.List;
 
 @Component
@@ -34,42 +30,39 @@ import java.util.List;
 public class ChatSender {
     private final UserService userService;
     private final UserPhraseService userPhraseService;
+    private final InlineKeyboardFactory inlineKeyboardFactory ;
+    private final ReplyKeyboardFactory replyKeyboardFactory;
 
     @Autowired
     public ChatSender(UserService userService,
-                      UserPhraseService userPhraseService) {
+                      UserPhraseService userPhraseService,
+                      InlineKeyboardFactory inlineKeyboardFactory,
+                      ReplyKeyboardFactory replyKeyboardFactory) {
         this.userService = userService;
         this.userPhraseService = userPhraseService;
+        this.inlineKeyboardFactory = inlineKeyboardFactory;
+        this.replyKeyboardFactory = replyKeyboardFactory;
     }
 
     public void sendMessage(Update update, Long chatId, PersonalVocabularyBot bot, String text) throws TelegramApiException, UserNotFoundException {
-        SendMessage sendMessage = new SendMessage();
-        sendMessage.setText(textBuilder(update, chatId, text));
-        sendMessage.setChatId(String.valueOf(chatId));
-        sendMessage.setParseMode(ParseMode.MARKDOWN);
-
-        if (userService.isUserMatchedWithBotState(chatId, BotStateEnum.DEFAULT_STATE)) {
-            ReplyKeyboardMarkup replyKeyboardMarkup = new ReplyKeyboardMarkup();
-            replyKeyboardMarkup.setKeyboard(createMainKeyboard());
-            replyKeyboardMarkup.setResizeKeyboard(true);
-            replyKeyboardMarkup.setOneTimeKeyboard(true);
-            sendMessage.setReplyMarkup(replyKeyboardMarkup);
-        } else if (userService.isUserMatchedWithBotState(chatId, BotStateEnum.READING_DICTIONARY)) {
-            getPhrasesFromPage(bot, chatId);
-        } else {
-            ReplyKeyboardMarkup replyKeyboardMarkup = new ReplyKeyboardMarkup();
-            List<KeyboardRow> keyboardRows = new ArrayList<>();
-            keyboardRows.add(createReturnToMenuRow());
-            replyKeyboardMarkup.setKeyboard(keyboardRows);
-            replyKeyboardMarkup.setResizeKeyboard(true);
-            replyKeyboardMarkup.setOneTimeKeyboard(true);
-            sendMessage.setReplyMarkup(replyKeyboardMarkup);
-        }
+        SendMessage sendMessage = createBaseSendMessage(update, chatId, text);
+        setSendingMessageReplyMarkup(sendMessage, chatId, bot);
 
         executeMessage(bot, sendMessage);
     }
 
-    public void deleteMessage(Update update, PersonalVocabularyBot bot, long chatId, int messageId) {
+    public void sendVoiceMessage(Update update, PersonalVocabularyBot bot) {
+        Long chatId = update.getMessage().getChatId();
+
+        SendVoice sendVoice = new SendVoice();
+        sendVoice.setVoice(new InputFile("file"));
+        sendVoice.setChatId(String.valueOf(chatId));
+        sendVoice.setParseMode(ParseMode.MARKDOWN);
+
+        executeMessage(bot, sendVoice);
+    }
+
+    public void deleteMessage(PersonalVocabularyBot bot, long chatId, int messageId) {
         DeleteMessage deleteMessage = new DeleteMessage();
         deleteMessage.setChatId(String.valueOf(chatId));
         deleteMessage.setMessageId(messageId);
@@ -83,58 +76,87 @@ public class ChatSender {
         int page = user.getCurrentPageNumber();
 
         int pageSize = 10;
-        int elementsPerRow = 5;
-        int currentRowElements = 0;
+        int maxPage = (int) Math.ceil((double) userPhraseService.countUserPhrases(chatId) / pageSize);
 
         int startIndex = page * pageSize;
         int endIndex = Math.min(startIndex + pageSize, phrasesText.size());
 
-        InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
-        List<List<InlineKeyboardButton>> inlineKeyboard = new ArrayList<>();
-        putGeneralButtons(inlineKeyboard);
-        List<InlineKeyboardButton> currentRow = new ArrayList<>();
-
-        StringBuilder sb = new StringBuilder();
-        sb.append(EmojiParser.parseToUnicode(":page_facing_up:"))
-                .append("Page ").append(page + 1).append(":\n")
-                .append("-----------------------------------------\n");
-
-        for (int i = startIndex; i < endIndex; i++) {
-            sb.append(i + 1).append(". ").append("*").append(phrasesText.get(i)).append("*").append("\n");
-            InlineKeyboardButton button = new InlineKeyboardButton(String.valueOf(i + 1));
-            button.setCallbackData(user.getUserId() + ": " + phrasesText.get(i));
-            currentRow.add(button);
-            currentRowElements++;
-
-            if (currentRowElements == elementsPerRow || i == endIndex - 1) {
-                inlineKeyboard.add(currentRow);
-
-                currentRow = new ArrayList<>();
-                currentRowElements = 0;
-            }
-        }
-
-        inlineKeyboardMarkup.setKeyboard(inlineKeyboard);
-
-        SendMessage sendMessage = new SendMessage();
-        sendMessage.setText(sb.toString());
-        sendMessage.setChatId(String.valueOf(chatId));
-        sendMessage.setParseMode(ParseMode.MARKDOWN);
+        InlineKeyboardMarkup inlineKeyboardMarkup = inlineKeyboardFactory.createDeleteConfirmationInlineMarkup(phrasesText, user, startIndex, endIndex);
+        SendMessage sendMessage = createPhrasesPageMessage(chatId, page, maxPage, phrasesText, startIndex, endIndex);
         sendMessage.setReplyMarkup(inlineKeyboardMarkup);
 
         executeMessage(bot, sendMessage);
     }
 
+    protected <T> void executeMessage(PersonalVocabularyBot bot, T message) {
+        try {
+            if (message instanceof SendMessage) {
+                bot.execute((SendMessage) message);
+            } else if (message instanceof SendVoice) {
+                bot.execute((SendVoice) message);
+            } else if (message instanceof SendSticker) {
+                bot.execute((SendSticker) message);
+            } else if (message instanceof DeleteMessage) {
+                bot.execute((DeleteMessage) message);
+            } else {
+                log.warn("Unsupported message type: " + message.getClass().getSimpleName() + "\n");
+            }
+        } catch (TelegramApiException e) {
+            log.warn("Error occurred while trying to send a message", e);
+        }
+    }
 
-    public void sendVoiceMessage(Update update, PersonalVocabularyBot bot) {
-        Long chatId = update.getMessage().getChatId();
+    protected SendMessage createPhraseWatchingPage(Long chatId, String callBackData) {
+        String phrase = callBackData.split(": ")[1];
+        return createTextSendMessage(chatId, "Chosen phrase:\n" + phrase);
+    }
 
-        SendVoice sendVoice = new SendVoice();
-        sendVoice.setVoice(new InputFile("file"));
-        sendVoice.setChatId(String.valueOf(chatId));
-        sendVoice.setParseMode(ParseMode.MARKDOWN);
+    protected SendMessage createDeleteConfirmationMessage(Long chatId) {
+        SendMessage sendMessage = createTextSendMessage(chatId, "Confirm deleting the phrase");
+        InlineKeyboardMarkup inlineKeyboardMarkup = inlineKeyboardFactory.createDeleteConfirmationInlineMarkup();
+        sendMessage.setReplyMarkup(inlineKeyboardMarkup);
+        return sendMessage;
+    }
 
-        executeMessage(bot, sendVoice);
+    private SendMessage createBaseSendMessage(Update update, Long chatId, String text) throws UserNotFoundException {
+        SendMessage sendMessage = new SendMessage();
+        sendMessage.setText(textBuilder(update, chatId, text));
+        sendMessage.setChatId(String.valueOf(chatId));
+        sendMessage.setParseMode(ParseMode.MARKDOWN);
+        return sendMessage;
+    }
+
+    private SendMessage createTextSendMessage(Long chatId, String text) {
+        SendMessage sendMessage = new SendMessage();
+        sendMessage.setText(text);
+        sendMessage.setChatId(String.valueOf(chatId));
+        sendMessage.setParseMode(ParseMode.MARKDOWN);
+        return sendMessage;
+    }
+
+    private SendMessage createPhrasesPageMessage(long chatId, int page, int maxPage, List<String> phrasesText, int startIndex, int endIndex) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(EmojiParser.parseToUnicode(":page_facing_up:"))
+                .append("Page ").append(page + 1).append("/").append(maxPage).append(":\n")
+                .append("-----------------------------------------\n");
+
+        for (int i = startIndex; i < endIndex; i++) {
+            sb.append(i + 1).append(". ").append("*").append(phrasesText.get(i)).append("*").append("\n");
+        }
+
+        return createTextSendMessage(chatId, sb.toString());
+    }
+
+    private void setSendingMessageReplyMarkup(SendMessage sendMessage, Long chatId, PersonalVocabularyBot bot) throws UserNotFoundException {
+        if (userService.isUserMatchedWithBotState(chatId, BotStateEnum.DEFAULT_STATE)) {
+            ReplyKeyboardMarkup replyKeyboardMarkup = replyKeyboardFactory.createMainKeyboardMarkup();
+            sendMessage.setReplyMarkup(replyKeyboardMarkup);
+        } else if (userService.isUserMatchedWithBotState(chatId, BotStateEnum.READING_DICTIONARY)) {
+            getPhrasesFromPage(bot, chatId);
+        } else {
+            ReplyKeyboardMarkup replyKeyboardMarkup = replyKeyboardFactory.createReturnToMenuKeyboardMarkup();
+            sendMessage.setReplyMarkup(replyKeyboardMarkup);
+        }
     }
 
     private String textBuilder(Update update, Long chatId, String text) throws UserNotFoundException {
@@ -170,32 +192,14 @@ public class ChatSender {
             case "/return_to_main_menu" -> {
                 return "Moving back... Press the button.";
             }
-            case "return_to_dictionary" -> {
+            case "/return_to_dictionary" -> {
                 return "Moving back to the dictionary...";
             }
         }
         return "";
     }
 
-    public <T> void executeMessage(PersonalVocabularyBot bot, T message) {
-        try {
-            if (message instanceof SendMessage) {
-                bot.execute((SendMessage) message);
-            } else if (message instanceof SendVoice) {
-                bot.execute((SendVoice) message);
-            } else if (message instanceof SendSticker) {
-                bot.execute((SendSticker) message);
-            } else if (message instanceof DeleteMessage) {
-                bot.execute((DeleteMessage) message);
-            } else {
-                log.warn("Unsupported message type: " + message.getClass().getSimpleName() + "\n");
-            }
-        } catch (TelegramApiException e) {
-            log.warn("Error occurred while trying to send a message", e);
-        }
-    }
-
-    public void registerUser(Update update) {
+    private void registerUser(Update update) {
         Chat chat = update.getMessage().getChat();
 
         User user = new User();
@@ -208,62 +212,5 @@ public class ChatSender {
         user.setCurrentPageNumber(0);
 
         userService.saveUser(user);
-    }
-
-    private List<KeyboardRow> createMainKeyboard() {
-        List<KeyboardRow> keyboardRows = new ArrayList<>();
-        KeyboardRow row = new KeyboardRow();
-        KeyboardButton writeButton = new KeyboardButton(EmojiParser.parseToUnicode(("write")
-                + ":writing:"));
-        KeyboardButton dictionaryButton = new KeyboardButton(EmojiParser.parseToUnicode(("dictionary")
-                + ":scroll:"));
-        row.add(writeButton);
-        row.add(dictionaryButton);
-        keyboardRows.add(row);
-
-        return keyboardRows;
-    }
-
-    private KeyboardRow createReturnToMenuRow() {
-        KeyboardRow row = new KeyboardRow();
-        String buttonText = EmojiParser.parseToUnicode(("return")
-                + ":house:");
-        KeyboardButton returnButton = new KeyboardButton(buttonText);
-
-        row.add(returnButton);
-
-        return row;
-    }
-
-
-    public void putGeneralButtons(List<List<InlineKeyboardButton>> rowsInline) {
-        InlineKeyboardButton backButton = new InlineKeyboardButton();
-        backButton.setText(EmojiParser.parseToUnicode(":arrow_left:"));
-        backButton.setCallbackData("BACK_BUTTON");
-
-        InlineKeyboardButton settingsButton = new InlineKeyboardButton();
-        settingsButton.setText(EmojiParser.parseToUnicode(":gear:"));
-        settingsButton.setCallbackData("SETTINGS_BUTTON");
-
-        InlineKeyboardButton cancelButton = new InlineKeyboardButton();
-        cancelButton.setText(EmojiParser.parseToUnicode(":house:"));
-        cancelButton.setCallbackData("CANCEL_BUTTON");
-
-        InlineKeyboardButton searchingButton = new InlineKeyboardButton();
-        searchingButton.setText(EmojiParser.parseToUnicode(":mag:"));
-        searchingButton.setCallbackData("SEARCHING_BUTTON");
-
-        InlineKeyboardButton forwardButton = new InlineKeyboardButton();
-        forwardButton.setText(EmojiParser.parseToUnicode(":arrow_right:"));
-        forwardButton.setCallbackData("FORWARD_BUTTON");
-
-        List<InlineKeyboardButton> rowInLine = new ArrayList<>();
-        rowInLine.add(backButton);
-        rowInLine.add(settingsButton);
-        rowInLine.add(cancelButton);
-        rowInLine.add(searchingButton);
-        rowInLine.add(forwardButton);
-
-        rowsInline.add(rowInLine);
     }
 }

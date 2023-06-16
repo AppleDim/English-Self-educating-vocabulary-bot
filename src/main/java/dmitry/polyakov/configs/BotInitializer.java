@@ -15,7 +15,6 @@ import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
 @Slf4j
 @Configuration
 public class BotInitializer {
-
     private final PersonalVocabularyBot bot;
 
     @Autowired
