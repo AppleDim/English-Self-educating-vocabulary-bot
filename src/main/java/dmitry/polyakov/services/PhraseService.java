@@ -1,7 +1,6 @@
 package dmitry.polyakov.services;
 
 import dmitry.polyakov.exceptions.PhraseNotFoundException;
-import dmitry.polyakov.exceptions.UserNotFoundException;
 import dmitry.polyakov.models.Phrase;
 import dmitry.polyakov.repositories.PhraseRepository;
 import org.springframework.beans.factory.annotation.Autowired;

@@ -25,19 +25,21 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import java.sql.Timestamp;
 import java.util.List;
 
+import static dmitry.polyakov.utils.LanguageLocalisation.messages;
+
 @Component
 @Slf4j
-public class ChatSender {
+public class ChatHandler {
     private final UserService userService;
     private final UserPhraseService userPhraseService;
-    private final InlineKeyboardFactory inlineKeyboardFactory ;
+    private final InlineKeyboardFactory inlineKeyboardFactory;
     private final ReplyKeyboardFactory replyKeyboardFactory;
 
     @Autowired
-    public ChatSender(UserService userService,
-                      UserPhraseService userPhraseService,
-                      InlineKeyboardFactory inlineKeyboardFactory,
-                      ReplyKeyboardFactory replyKeyboardFactory) {
+    public ChatHandler(UserService userService,
+                       UserPhraseService userPhraseService,
+                       InlineKeyboardFactory inlineKeyboardFactory,
+                       ReplyKeyboardFactory replyKeyboardFactory) {
         this.userService = userService;
         this.userPhraseService = userPhraseService;
         this.inlineKeyboardFactory = inlineKeyboardFactory;
@@ -108,11 +110,11 @@ public class ChatSender {
 
     protected SendMessage createPhraseWatchingPage(Long chatId, String callBackData) {
         String phrase = callBackData.split(": ")[1];
-        return createTextSendMessage(chatId, "Chosen phrase:\n" + phrase);
+        return createTextSendMessage(chatId,messages.getString("message.chosen_phrase") + "\n" + phrase);
     }
 
     protected SendMessage createDeleteConfirmationMessage(Long chatId) {
-        SendMessage sendMessage = createTextSendMessage(chatId, "Confirm deleting the phrase");
+        SendMessage sendMessage = createTextSendMessage(chatId, messages.getString("message.confirm_deleting"));
         InlineKeyboardMarkup inlineKeyboardMarkup = inlineKeyboardFactory.createDeleteConfirmationInlineMarkup();
         sendMessage.setReplyMarkup(inlineKeyboardMarkup);
         return sendMessage;
@@ -137,7 +139,7 @@ public class ChatSender {
     private SendMessage createPhrasesPageMessage(long chatId, int page, int maxPage, List<String> phrasesText, int startIndex, int endIndex) {
         StringBuilder sb = new StringBuilder();
         sb.append(EmojiParser.parseToUnicode(":page_facing_up:"))
-                .append("Page ").append(page + 1).append("/").append(maxPage).append(":\n")
+                .append(messages.getString("chat.page_number")).append(page + 1).append("/").append(maxPage).append(":\n")
                 .append("-----------------------------------------\n");
 
         for (int i = startIndex; i < endIndex; i++) {
@@ -153,6 +155,9 @@ public class ChatSender {
             sendMessage.setReplyMarkup(replyKeyboardMarkup);
         } else if (userService.isUserMatchedWithBotState(chatId, BotStateEnum.READING_DICTIONARY)) {
             getPhrasesFromPage(bot, chatId);
+        } else if (userService.isUserMatchedWithBotState(chatId, BotStateEnum.LANGUAGE_CHANGE)) {
+            ReplyKeyboardMarkup replyKeyboardMarkup = replyKeyboardFactory.createLanguageKeyboardMarkup();
+            sendMessage.setReplyMarkup(replyKeyboardMarkup);
         } else {
             ReplyKeyboardMarkup replyKeyboardMarkup = replyKeyboardFactory.createReturnToMenuKeyboardMarkup();
             sendMessage.setReplyMarkup(replyKeyboardMarkup);
@@ -164,36 +169,42 @@ public class ChatSender {
             case "/start" -> {
                 if (!userService.isUserFoundById(chatId)) {
                     registerUser(update);
-                    return String.format("Hello, @%s", userService.findUserById(chatId).getNickname());
+                    return String.format(messages.getString("chat.hello")
+                            + " @%s", userService.findUserById(chatId).getNickname());
 
                 } else
-                    return "The bot was already started.";
+                    return messages.getString("message.bot_started");
             }
 
             case "/help" -> {
-                return "Here's the helping page: ";
+                return messages.getString("message.helping");
             }
-
             case "/write" -> {
-                return "Enter your words or phrase";
+                return messages.getString("message.writing");
             }
-
             case "/phrase" -> {
-                return "Phrase has been stored.";
+                return messages.getString("message.phrase_stored");
             }
-
+            case "/language" -> {
+                return messages.getString("message.choose_language");
+            }
+            case "/rus_lang" -> {
+                return messages.getString("message.lang_chosen");
+            }
+            case "/eng_lang" -> {
+                return messages.getString("message.lang_chosen");
+            }
             case "/illegal_characters" -> {
-                return "Only latin letters are allowed.";
+                return messages.getString("message.illegal_chars");
             }
-
             case "/phrase_already_stored" -> {
-                return "This phrase was already stored.";
+                return messages.getString("message.phrase_already_stored");
             }
             case "/return_to_main_menu" -> {
-                return "Moving back... Press the button.";
+                return messages.getString("message.moving_back.main_menu");
             }
             case "/return_to_dictionary" -> {
-                return "Moving back to the dictionary...";
+                return messages.getString("message.moving_back.dict");
             }
         }
         return "";

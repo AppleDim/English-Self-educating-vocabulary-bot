@@ -8,11 +8,14 @@ import dmitry.polyakov.exceptions.UserNotFoundException;
 import dmitry.polyakov.handlers.CallbackHandler;
 import dmitry.polyakov.handlers.MessageHandler;
 import dmitry.polyakov.models.User;
+import dmitry.polyakov.utils.LanguageLocalisation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.objects.*;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+
+import static dmitry.polyakov.utils.LanguageLocalisation.messages;
 
 @Slf4j
 @Service
@@ -35,6 +38,7 @@ public class BotServiceImpl implements BotService {
         if (update.hasMessage() && update.getMessage().hasText()) {
             String text = update.getMessage().getText();
             long chatId = update.getMessage().getChatId();
+
             try {
                 handleMessages(update, chatId, text, bot);
             } catch (UserNotFoundException e) {
@@ -67,42 +71,42 @@ public class BotServiceImpl implements BotService {
         if (command.equals("/help")) {
             user.setUserBotState(BotStateEnum.DEFAULT_STATE);
             userService.saveUser(user);
+
             commandHandler.handleHelpCommandReceived(update, chatId, bot);
 
-        } else if (command.equals("/dictionary")) {
-            user.setUserBotState(BotStateEnum.READING_DICTIONARY);
-            userService.saveUser(user);
-            commandHandler.handleDictionaryCommandReceived(chatId, bot);
-
-        } else if (command.equals(EmojiParser.parseToUnicode(("dictionary")
+        } else if (command.equals(EmojiParser.parseToUnicode(messages.getString("button.name.dictionary")
                 + ":scroll:"))
                 && user.getUserBotState().equals(BotStateEnum.DEFAULT_STATE)) {
             user.setUserBotState(BotStateEnum.READING_DICTIONARY);
             userService.saveUser(user);
+
             commandHandler.handleDictionaryCommandReceived(chatId, bot);
 
-        } else if (command.equals("/settings")) {
-            commandHandler.handleSettingsCommandReceived(update, chatId, bot);
-
         } else if (command.equals("/language")) {
-            commandHandler.handleLanguageCommandReceived(update, chatId, bot);
-
-        } else if (command.equals("/write")) {
-            user.setUserBotState(BotStateEnum.WRITING_WORDS);
+            user.setUserBotState(BotStateEnum.LANGUAGE_CHANGE);
             userService.saveUser(user);
-            commandHandler.handleWriteCommandReceived(update, chatId, bot);
+            commandHandler.handleBotLanguageChange(update, chatId, bot);
 
-        } else if (command.equals(EmojiParser.parseToUnicode(("write")
+        } else if (command.equals(EmojiParser.parseToUnicode(messages.getString("button.name.write")
                 + ":writing:"))
                 && user.getUserBotState().equals(BotStateEnum.DEFAULT_STATE)) {
             user.setUserBotState(BotStateEnum.WRITING_WORDS);
             userService.saveUser(user);
+
             commandHandler.handleWriteCommandReceived(update, chatId, bot);
-        } else if (command.equals(EmojiParser.parseToUnicode(("return")
+
+        } else if (command.equals(EmojiParser.parseToUnicode(messages.getString("button.name.return")
                 + ":house:")) && !user.getUserBotState().equals(BotStateEnum.DEFAULT_STATE)) {
             user.setUserBotState(BotStateEnum.DEFAULT_STATE);
             userService.saveUser(user);
+
             commandHandler.handleReturnButtonPressed(update, chatId, bot);
+
+        } else if (command.equals(LanguageLocalisation.englishLang)
+                || command.equals(LanguageLocalisation.russianLang)) {
+            commandHandler.changeBotLanguage(update, chatId, command, bot);
+            commandHandler.handleReturnButtonPressed(update, chatId, bot);
+
         } else if (user.getUserBotState().equals(BotStateEnum.WRITING_WORDS)) {
             commandHandler.handlePhraseReceived(update, chatId, command, bot);
         }
@@ -112,17 +116,17 @@ public class BotServiceImpl implements BotService {
         String callBackData = update.getCallbackQuery().getData();
         long chatId = update.getCallbackQuery().getMessage().getChatId();
         int messageId = update.getCallbackQuery().getMessage().getMessageId();
+
         User user = userService.findUserById(chatId);
+
         switch (callBackData) {
-            case "BACK_BUTTON" -> {
-                callbackHandler.handleBackButtonPressed(bot, chatId, messageId);
-            }
+            case "BACK_BUTTON" -> callbackHandler.handleBackButtonPressed(bot, chatId, messageId);
 
             case "SETTINGS_BUTTON" -> {
-
             }
+
             case "CANCEL_BUTTON" -> {
-                if (user.getUserBotState().equals(BotStateEnum.READING_WORD)) {
+                if (user.getUserBotState().equals(BotStateEnum.READING_PHRASE)) {
                     commandHandler.handleCancelButtonWhileReadingPhrasePressed(bot, chatId, messageId);
                     commandHandler.handleDictionaryCommandReceived(chatId, bot);
                 } else
@@ -130,20 +134,18 @@ public class BotServiceImpl implements BotService {
             }
 
             case "SEARCHING_BUTTON" -> {
-
             }
+
             case "FORWARD_BUTTON" -> callbackHandler.handleForwardButtonPressed(bot, chatId, messageId);
 
-            case "DELETE_BUTTON" -> {
-                callbackHandler.handleDeletePhraseButtonPressed(bot, chatId, messageId);
-            }
+            case "DELETE_BUTTON" -> callbackHandler.handleDeletePhraseButtonPressed(bot, chatId, messageId);
+
             case "YES_BUTTON" -> {
                 commandHandler.deletePhrase(bot, chatId);
                 callbackHandler.handlePhraseNumberPressed(bot, chatId, messageId, callBackData);
-
-            } case "NO_BUTTON" -> {
-                callbackHandler.handleNOButtonPressed(bot, chatId, messageId);
             }
+
+            case "NO_BUTTON" -> callbackHandler.handleNOButtonPressed(bot, chatId, messageId);
 
         }
         if (callBackData.matches("[0-9]+: [a-zA-Z'\\-, ]+")) {
