@@ -6,6 +6,8 @@ import lombok.*;
 import jakarta.persistence.*;
 import java.sql.Timestamp;
 import java.util.HashSet;
+import java.util.Locale;
+import java.util.ResourceBundle;
 import java.util.Set;
 
 @Entity
@@ -42,4 +44,7 @@ public class User {
 
     @Column(name = "current_phrase")
     private String currentPhrase;
+
+    @Column(name = "language")
+    private String language;
 }
