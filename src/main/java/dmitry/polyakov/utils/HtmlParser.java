@@ -7,8 +7,6 @@ import org.jsoup.nodes.Document;
 
 import java.io.IOException;
 
-import static dmitry.polyakov.constants.BotStateEnum.DEFAULT_STATE;
-
 @Slf4j
 public class HtmlParser {
     public Document connectToUrl(String url) {

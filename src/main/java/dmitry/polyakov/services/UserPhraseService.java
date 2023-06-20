@@ -6,6 +6,7 @@ import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedList;
 import java.util.List;
 
 @Service
@@ -17,9 +18,16 @@ public class UserPhraseService {
         this.userPhraseRepository = userPhraseRepository;
     }
 
-    public List<String> findUserPhrasesById(Long userId) {
-        return userPhraseRepository.findUserPhrasesByUserId(userId);
+    public LinkedList<String> findUserPhrasesByIdOrderByPhraseId(Long userId) {
+        return userPhraseRepository.findUserPhrasesByUserIdOrderByPhraseId(userId);
     }
+    public LinkedList<String> findUserPhrasesByIdOrderByCountPhraseViewsDesc(Long userId) {
+        return userPhraseRepository.findUserPhrasesByUserIdOrderByCountPhraseViewsDesc(userId);
+    }
+    public LinkedList<String> findUserPhrasesByUserIdOrderByPhraseLengthAsc(Long userId) {
+        return userPhraseRepository.findUserPhrasesByUserIdOrderByPhraseLengthAsc(userId);
+    }
+
 
     public void saveUserPhrase(UserPhrase userPhrase) {
         userPhraseRepository.save(userPhrase);
@@ -38,7 +46,7 @@ public class UserPhraseService {
     }
 
     public int countUserPhrases(Long userId) {
-        return findUserPhrasesById(userId).size();
+        return findUserPhrasesByIdOrderByPhraseId(userId).size();
     }
 
     @Transactional
@@ -52,5 +60,19 @@ public class UserPhraseService {
 
     public UserPhrase findUserPhraseByIds(Long userId, Long phraseId) {
         return userPhraseRepository.findUserPhraseByUserIdAndPhraseId(userId, phraseId);
+    }
+
+    public int getNumberPhraseViews(Long userId, String phraseText) {
+        Long phraseId = userPhraseRepository.findPhraseIdByUserIdAndPhrase(userId, phraseText);
+        UserPhrase userPhrase = userPhraseRepository.findUserPhraseByUserIdAndPhraseId(userId, phraseId);
+        return userPhrase.getCountPhraseViews();
+    }
+
+    @Transactional
+    public void incrementCountPhraseViews(Long userId, String phraseText) {
+        Long phraseId = userPhraseRepository.findPhraseIdByUserIdAndPhrase(userId, phraseText);
+        UserPhrase userPhrase = userPhraseRepository.findUserPhraseByUserIdAndPhraseId(userId, phraseId);
+        userPhrase.setCountPhraseViews(userPhrase.getCountPhraseViews() + 1);
+        userPhraseRepository.save(userPhrase);
     }
 }

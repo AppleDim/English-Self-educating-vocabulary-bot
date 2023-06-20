@@ -27,6 +27,24 @@ public class InlineKeyboardFactory {
 
         return inlineKeyboardMarkup;
     }
+    public InlineKeyboardMarkup createSettingsInlineMarkup() {
+        InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> inlineKeyboard = new ArrayList<>();
+        List<InlineKeyboardButton> row = new ArrayList<>();
+
+        InlineKeyboardButton orderButton = createInlineKeyboardButton("order", "ORDER_BUTTON");
+        InlineKeyboardButton cancelButton = createInlineKeyboardButton(EmojiParser.parseToUnicode(":house:"), "CANCEL_BUTTON");
+        InlineKeyboardButton amountButton = createInlineKeyboardButton("amount", "AMOUNT_BUTTON");
+
+        row.add(orderButton);
+        row.add(cancelButton);
+        row.add(amountButton);
+
+        inlineKeyboard.add(row);
+        inlineKeyboardMarkup.setKeyboard(inlineKeyboard);
+
+        return inlineKeyboardMarkup;
+    }
 
     protected InlineKeyboardMarkup createDeleteConfirmationInlineMarkup() {
         InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
@@ -87,6 +105,10 @@ public class InlineKeyboardFactory {
     }
 
     private void putGeneralDictionaryButtons(List<List<InlineKeyboardButton>> rowsInline) {
+        InlineKeyboardButton fastBackButton = new InlineKeyboardButton();
+        fastBackButton.setText(EmojiParser.parseToUnicode(":rewind:"));
+        fastBackButton.setCallbackData("FAST_BACK_BUTTON");
+
         InlineKeyboardButton backButton = new InlineKeyboardButton();
         backButton.setText(EmojiParser.parseToUnicode(":arrow_left:"));
         backButton.setCallbackData("BACK_BUTTON");
@@ -107,12 +129,18 @@ public class InlineKeyboardFactory {
         forwardButton.setText(EmojiParser.parseToUnicode(":arrow_right:"));
         forwardButton.setCallbackData("FORWARD_BUTTON");
 
+        InlineKeyboardButton fastForwardButton = new InlineKeyboardButton();
+        fastForwardButton.setText(EmojiParser.parseToUnicode(":fast_forward:"));
+        fastForwardButton.setCallbackData("FAST_FORWARD_BUTTON");
+
         List<InlineKeyboardButton> rowInLine = new ArrayList<>();
+        rowInLine.add(fastBackButton);
         rowInLine.add(backButton);
         rowInLine.add(settingsButton);
         rowInLine.add(cancelButton);
         rowInLine.add(searchingButton);
         rowInLine.add(forwardButton);
+        rowInLine.add(fastForwardButton);
 
         rowsInline.add(rowInLine);
     }

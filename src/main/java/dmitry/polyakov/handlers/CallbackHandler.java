@@ -13,113 +13,170 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
-import java.util.List;
+import java.util.LinkedList;
 
 @Component
 @Slf4j
 public class CallbackHandler {
     private final UserService userService;
     private final UserPhraseService userPhraseService;
-    private final ChatSender chatSender;
+    private final ChatHandler chatHandler;
     private final InlineKeyboardFactory inlineKeyboardFactory;
     public CallbackHandler(UserService userService,
                            UserPhraseService userPhraseService,
-                           ChatSender chatSender,
+                           ChatHandler chatSender,
                            InlineKeyboardFactory inlineKeyboardFactory) {
         this.userService = userService;
         this.userPhraseService = userPhraseService;
-        this.chatSender = chatSender;
+        this.chatHandler = chatSender;
         this.inlineKeyboardFactory = inlineKeyboardFactory;
     }
 
-    public void handleBackButtonPressed(PersonalVocabularyBot bot, long chatId, int messageId) throws UserNotFoundException {
-        chatSender.deleteMessage(bot, chatId, messageId);
+    public void handleFastBackButtonPressed(PersonalVocabularyBot bot, long chatId, int messageId) throws UserNotFoundException {
+        chatHandler.deleteMessage(bot, chatId, messageId);
+
         User user = userService.findUserById(chatId);
         int currentPage = user.getCurrentPageNumber();
 
-        if (user.getCurrentPageNumber() > 0) {
-            user.setCurrentPageNumber(--currentPage);
+        if (currentPage >= 10) {
+            user.setCurrentPageNumber(currentPage - 10);
         } else {
             user.setCurrentPageNumber(0);
         }
 
         userService.saveUser(user);
 
-        chatSender.getPhrasesFromPage(bot, chatId);
+        chatHandler.getPhrasesFromPage(bot, chatId);
 
-        log.info("@" + userService.findUserById(chatId).getNickname() + " scrolled to the next page: " + currentPage);
+        log.info("@" + userService.findUserById(chatId).getNickname() + " scrolled 10 pages back to the page: " + user.getCurrentPageNumber());
     }
 
-    public void handleSettingsButtonPressed(Update update, PersonalVocabularyBot bot, long chatId) throws UserNotFoundException {
-        User user = userService.findUserById(chatId);
-        user.setUserBotState(BotStateEnum.SETTINGS);
-        userService.saveUser(user);
-        chatSender.getPhrasesFromPage(bot, chatId);
-    }
+    public void handleBackButtonPressed(PersonalVocabularyBot bot, long chatId, int messageId) throws UserNotFoundException {
+        chatHandler.deleteMessage(bot, chatId, messageId);
 
-    public void handleCancelButtonPressed(Update update, PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException, TelegramApiException {
         User user = userService.findUserById(chatId);
-        user.setUserBotState(BotStateEnum.DEFAULT_STATE);
-        chatSender.deleteMessage(bot, chatId, messageId);
-        userService.saveUser(user);
-        chatSender.sendMessage(update, chatId, bot, "/return_to_main_menu");
-
-        log.info("@" + userService.findUserById(chatId).getNickname() + " returned to the main");
-    }
-
-    public void handleForwardButtonPressed(PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException {
-        chatSender.deleteMessage(bot, chatId, messageId);
-        User user = userService.findUserById(chatId);
-        int maxPage = (int) Math.ceil((double) userPhraseService.countUserPhrases(chatId) / 10);
         int currentPage = user.getCurrentPageNumber();
-        if (currentPage < maxPage - 1) {
-            user.setCurrentPageNumber(currentPage + 1);
+
+        if (currentPage > 0) {
+            user.setCurrentPageNumber(currentPage - 1);
         } else {
-            user.setCurrentPageNumber(maxPage - 1);
+            user.setCurrentPageNumber(0);
         }
 
         userService.saveUser(user);
 
-        chatSender.getPhrasesFromPage(bot, chatId);
+        chatHandler.getPhrasesFromPage(bot, chatId);
 
-        log.info("@" + userService.findUserById(chatId).getNickname() + " scrolled to the next page: " + currentPage);
+        log.info("@" + userService.findUserById(chatId).getNickname() + " scrolled to the previous page: " + user.getCurrentPageNumber());
+    }
+
+    public void handleSettingsButtonPressed(PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException {
+        chatHandler.deleteMessage(bot, chatId, messageId);
+
+        User user = userService.findUserById(chatId);
+        user.setUserBotState(BotStateEnum.SETTINGS);
+        userService.saveUser(user);
+
+        SendMessage sendMessage = chatHandler.createSettingsPageMessage(chatId);
+        chatHandler.executeMessage(bot, sendMessage);
+    }
+
+    public void handleCancelButtonPressed(Update update, PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException, TelegramApiException {
+        chatHandler.deleteMessage(bot, chatId, messageId);
+
+        User user = userService.findUserById(chatId);
+        user.setUserBotState(BotStateEnum.DEFAULT_STATE);
+        userService.saveUser(user);
+
+        chatHandler.sendMessage(update, chatId, bot, "/return_to_main_menu");
+
+        log.info("@" + userService.findUserById(chatId).getNickname() + " returned to the main");
     }
 
     public void handleSearchingButtonPressed(Update update, PersonalVocabularyBot bot, long chatId) throws UserNotFoundException {
         User user = userService.findUserById(chatId);
         user.setUserBotState(BotStateEnum.SETTINGS);
         userService.saveUser(user);
-        chatSender.getPhrasesFromPage(bot, chatId);
+        chatHandler.getPhrasesFromPage(bot, chatId);
+    }
+
+    public void handleForwardButtonPressed(PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException {
+        chatHandler.deleteMessage(bot, chatId, messageId);
+
+        User user = userService.findUserById(chatId);
+        int maxPage = (int) Math.ceil((double) userPhraseService.countUserPhrases(chatId) / 10);
+        int currentPage = user.getCurrentPageNumber();
+
+        if (currentPage < maxPage - 1) {
+            user.setCurrentPageNumber(currentPage + 1);
+        } else {
+            user.setCurrentPageNumber(maxPage - 1);
+        }
+        userService.saveUser(user);
+
+        chatHandler.getPhrasesFromPage(bot, chatId);
+
+        log.info("@" + userService.findUserById(chatId).getNickname() + " scrolled to the next page: " + currentPage);
+    }
+
+    public void handleFastForwardButtonPressed(PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException {
+        chatHandler.deleteMessage(bot, chatId, messageId);
+
+        User user = userService.findUserById(chatId);
+        int maxPage = (int) Math.ceil((double) userPhraseService.countUserPhrases(chatId) / 10);
+        int currentPage = user.getCurrentPageNumber();
+
+        if (currentPage < maxPage - 10) {
+            user.setCurrentPageNumber(currentPage + 10);
+        } else {
+            user.setCurrentPageNumber(maxPage - 1);
+        }
+
+        userService.saveUser(user);
+
+        chatHandler.getPhrasesFromPage(bot, chatId);
+
+        log.info("@" + userService.findUserById(chatId).getNickname() + " scrolled 10 pages forward to the page: " + user.getCurrentPageNumber());
     }
 
 
     public void handlePhraseNumberPressed(PersonalVocabularyBot bot, Long chatId, int messageId, String callBackData) throws UserNotFoundException {
-        chatSender.deleteMessage(bot, chatId, messageId);
+        chatHandler.deleteMessage(bot, chatId, messageId);
         User user = userService.findUserById(chatId);
-        user.setUserBotState(BotStateEnum.READING_WORD);
-        List<String> phrasesText = userPhraseService.findUserPhrasesById(chatId);
+        LinkedList<String> phrasesText = userPhraseService.findUserPhrasesByIdOrderByPhraseId(chatId);
+
+        String phrase = "";
+
         for (String str : phrasesText) {
             if (isChosenPhrase(callBackData, user, str)) {
+                phrase = str;
+                user.setUserBotState(BotStateEnum.READING_PHRASE);
+                userService.saveUser(user);
+
                 InlineKeyboardMarkup inlineKeyboardMarkup = inlineKeyboardFactory.createDeletePageInlineKeyboardMarkup();
-                SendMessage sendMessage = chatSender.createPhraseWatchingPage(chatId, callBackData);
+                SendMessage sendMessage = chatHandler.createPhraseWatchingPage(chatId, callBackData);
                 sendMessage.setReplyMarkup(inlineKeyboardMarkup);
-                chatSender.executeMessage(bot, sendMessage);
+                chatHandler.executeMessage(bot, sendMessage);
                 break;
             }
         }
+
+        log.info("@" + user.getNickname() + " opened the page with the phrase: " + phrase);
     }
 
+
     public void handleDeletePhraseButtonPressed(PersonalVocabularyBot bot, Long chatId, int messageId) {
-        chatSender.deleteMessage(bot, chatId, messageId);
-        SendMessage sendMessage = chatSender.createDeleteConfirmationMessage(chatId);
-        chatSender.executeMessage(bot, sendMessage);
+        chatHandler.deleteMessage(bot, chatId, messageId);
+        SendMessage sendMessage = chatHandler.createDeleteConfirmationMessage(chatId);
+        chatHandler.executeMessage(bot, sendMessage);
     }
 
     public void handleNOButtonPressed(PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException {
-        chatSender.getPhrasesFromPage(bot, chatId);
+        chatHandler.getPhrasesFromPage(bot, chatId);
+        chatHandler.deleteMessage(bot, chatId, messageId);
+
         User user = userService.findUserById(chatId);
         user.setUserBotState(BotStateEnum.READING_DICTIONARY);
-        chatSender.deleteMessage(bot, chatId, messageId);
         userService.saveUser(user);
 
         log.info("@" + userService.findUserById(chatId).getNickname() + " canceled delete of phrase");

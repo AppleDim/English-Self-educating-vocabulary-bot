@@ -25,7 +25,8 @@ CREATE TABLE telegram.phrases
 (
     phrase_id     BIGSERIAL PRIMARY KEY,
     phrase        VARCHAR(255) NOT NULL,
-    searched_date TIMESTAMP    NOT NULL
+    searched_date TIMESTAMP    NOT NULL,
+    count_phrases_views INT
 );
 
 CREATE TABLE telegram.users_phrases

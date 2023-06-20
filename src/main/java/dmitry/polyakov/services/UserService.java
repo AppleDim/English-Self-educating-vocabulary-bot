@@ -68,4 +68,9 @@ public class UserService {
             userRepository.save(user);
         }
     }
+
+    public String getLanguage(Long chatId) {
+        Optional<User> userOptional = userRepository.findById(chatId);
+        return userOptional.map(User::getLanguage).orElse("en");
+    }
 }
