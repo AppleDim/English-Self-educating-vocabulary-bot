@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.objects.*;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
-import static dmitry.polyakov.utils.LanguageLocalisation.messages;
+import java.util.ResourceBundle;
 
 @Slf4j
 @Service
@@ -23,14 +23,20 @@ public class BotServiceImpl implements BotService {
     private final MessageHandler commandHandler;
     private final CallbackHandler callbackHandler;
     private final UserService userService;
+    private final UserPhraseService userPhraseService;
+    private final LanguageLocalisation languageLocalisation;
 
     @Autowired
     public BotServiceImpl(MessageHandler commandHandler,
                           CallbackHandler callbackHandler,
-                          UserService userService) {
+                          UserService userService,
+                          UserPhraseService userPhraseService,
+                          LanguageLocalisation languageLocalisation) {
         this.commandHandler = commandHandler;
         this.callbackHandler = callbackHandler;
         this.userService = userService;
+        this.languageLocalisation = languageLocalisation;
+        this.userPhraseService = userPhraseService;
     }
 
     @Override
@@ -61,6 +67,7 @@ public class BotServiceImpl implements BotService {
     }
 
     private void handleMessages(Update update, Long chatId, String command, PersonalVocabularyBot bot) throws UserNotFoundException, PhraseNotFoundException, TelegramApiException {
+        ResourceBundle messages = languageLocalisation.getMessages(chatId);
 
         if (command.equals("/start")) {
             commandHandler.handleStartCommandReceived(update, chatId, bot);
@@ -102,9 +109,9 @@ public class BotServiceImpl implements BotService {
 
             commandHandler.handleReturnButtonPressed(update, chatId, bot);
 
-        } else if (command.equals(LanguageLocalisation.englishLang)
-                || command.equals(LanguageLocalisation.russianLang)) {
-            commandHandler.changeBotLanguage(update, chatId, command, bot);
+        } else if (command.equals(languageLocalisation.englishLang)
+                || command.equals(languageLocalisation.russianLang)) {
+            commandHandler.handleLanguageChange(update, chatId, command, bot);
             commandHandler.handleReturnButtonPressed(update, chatId, bot);
 
         } else if (user.getUserBotState().equals(BotStateEnum.WRITING_WORDS)) {
@@ -120,13 +127,15 @@ public class BotServiceImpl implements BotService {
         User user = userService.findUserById(chatId);
 
         switch (callBackData) {
+            case "FAST_BACK_BUTTON" -> callbackHandler.handleFastBackButtonPressed(bot, chatId, messageId);
+
             case "BACK_BUTTON" -> callbackHandler.handleBackButtonPressed(bot, chatId, messageId);
 
-            case "SETTINGS_BUTTON" -> {
-            }
+            case "SETTINGS_BUTTON" -> callbackHandler.handleSettingsButtonPressed(bot, chatId, messageId);
 
             case "CANCEL_BUTTON" -> {
-                if (user.getUserBotState().equals(BotStateEnum.READING_PHRASE)) {
+                if (user.getUserBotState().equals(BotStateEnum.READING_PHRASE)
+                        || user.getUserBotState().equals(BotStateEnum.SETTINGS)) {
                     commandHandler.handleCancelButtonWhileReadingPhrasePressed(bot, chatId, messageId);
                     commandHandler.handleDictionaryCommandReceived(chatId, bot);
                 } else
@@ -138,6 +147,8 @@ public class BotServiceImpl implements BotService {
 
             case "FORWARD_BUTTON" -> callbackHandler.handleForwardButtonPressed(bot, chatId, messageId);
 
+            case "FAST_FORWARD_BUTTON" -> callbackHandler.handleFastForwardButtonPressed(bot, chatId, messageId);
+
             case "DELETE_BUTTON" -> callbackHandler.handleDeletePhraseButtonPressed(bot, chatId, messageId);
 
             case "YES_BUTTON" -> {
@@ -146,9 +157,16 @@ public class BotServiceImpl implements BotService {
             }
 
             case "NO_BUTTON" -> callbackHandler.handleNOButtonPressed(bot, chatId, messageId);
+            case "ORDER_BUTTON" -> {
+
+            }
+            case "AMOUNT_BUTTON" -> {
+
+            }
 
         }
         if (callBackData.matches("[0-9]+: [a-zA-Z'\\-, ]+")) {
+            userPhraseService.incrementCountPhraseViews(chatId, callBackData.split(": ")[1]);
             callbackHandler.handlePhraseNumberPressed(bot, chatId, messageId, callBackData);
         }
     }
