@@ -10,7 +10,8 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 @AllArgsConstructor
-@Table(name = "users_phrases", schema = "telegram")
+@Table(name = "users_phrases", schema = "telegram",
+        uniqueConstraints = {@UniqueConstraint(columnNames = {"user_id", "phrase_id"})})
 public class UserPhrase {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -24,4 +25,7 @@ public class UserPhrase {
     @ManyToOne
     @JoinColumn(name = "phrase_id")
     private Phrase phrase;
+
+    @Column(name = "count_phrase_views")
+    private int countPhraseViews;
 }
