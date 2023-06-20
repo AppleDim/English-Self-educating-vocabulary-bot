@@ -1,6 +1,5 @@
 package dmitry.polyakov.repositories;
 
-import dmitry.polyakov.models.Phrase;
 import dmitry.polyakov.models.UserPhrase;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -8,7 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
+import java.util.LinkedList;
 
 @Repository
 public interface UserPhraseRepository extends JpaRepository<UserPhrase, Long> {
@@ -16,8 +15,49 @@ public interface UserPhraseRepository extends JpaRepository<UserPhrase, Long> {
             "FROM UserPhrase up " +
             "JOIN up.user u " +
             "JOIN up.phrase p " +
-            "WHERE u.userId = :userId")
-    List<String> findUserPhrasesByUserId(@Param("userId") Long userId);
+            "WHERE u.userId = :userId " +
+            "ORDER BY p.phraseId ASC")
+    LinkedList<String> findUserPhrasesByUserIdOrderByPhraseId(@Param("userId") Long userId);
+
+    @Query("SELECT up.phrase.phrase " +
+            "FROM UserPhrase up " +
+            "JOIN up.user u " +
+            "JOIN up.phrase p " +
+            "WHERE u.userId = :userId " +
+            "ORDER BY up.countPhraseViews ASC")
+    LinkedList<String> findUserPhrasesByUserIdOrderByCountPhraseViewsAsc(@Param("userId") Long userId);
+
+    @Query("SELECT up.phrase.phrase " +
+            "FROM UserPhrase up " +
+            "JOIN up.user u " +
+            "JOIN up.phrase p " +
+            "WHERE u.userId = :userId " +
+            "ORDER BY LENGTH(up.phrase.phrase) ASC")
+    LinkedList<String> findUserPhrasesByUserIdOrderByPhraseLengthAsc(@Param("userId") Long userId);
+
+    @Query("SELECT up.phrase.phrase " +
+            "FROM UserPhrase up " +
+            "JOIN up.user u " +
+            "JOIN up.phrase p " +
+            "WHERE u.userId = :userId " +
+            "ORDER BY p.phraseId DESC")
+    LinkedList<String> findUserPhrasesByUserIdOrderByPhraseIdDesc(@Param("userId") Long userId);
+
+    @Query("SELECT up.phrase.phrase " +
+            "FROM UserPhrase up " +
+            "JOIN up.user u " +
+            "JOIN up.phrase p " +
+            "WHERE u.userId = :userId " +
+            "ORDER BY LENGTH(up.phrase.phrase) DESC")
+    LinkedList<String> findUserPhrasesByUserIdOrderByPhraseLengthDesc(@Param("userId") Long userId);
+
+    @Query("SELECT up.phrase.phrase " +
+            "FROM UserPhrase up " +
+            "JOIN up.user u " +
+            "JOIN up.phrase p " +
+            "WHERE u.userId = :userId " +
+            "ORDER BY up.countPhraseViews DESC")
+    LinkedList<String> findUserPhrasesByUserIdOrderByCountPhraseViewsDesc(@Param("userId") Long userId);
 
     boolean existsByUserUserIdAndPhrasePhraseId(Long userId, Long phraseId);
 
