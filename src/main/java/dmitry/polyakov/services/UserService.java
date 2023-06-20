@@ -69,18 +69,8 @@ public class UserService {
         }
     }
 
-/*    public String getBotLanguage(Long chatId) {
+    public String getLanguage(Long chatId) {
         Optional<User> userOptional = userRepository.findById(chatId);
-        return userOptional.map(User::getBotLanguage).orElse("English");
+        return userOptional.map(User::getLanguage).orElse("en");
     }
-
-    @Transactional
-    public void setBotLanguage(Long chatId, String botLanguage) {
-        Optional<User> userOptional = userRepository.findById(chatId);
-        if (userOptional.isPresent()) {
-            User user = userOptional.get();
-            user.setCurrentPhrase(botLanguage);
-            userRepository.save(user);
-        }
-    }*/
 }

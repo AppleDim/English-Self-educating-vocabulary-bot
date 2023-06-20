@@ -29,17 +29,20 @@ public class MessageHandler {
     private final UserService userService;
     private final PhraseService phraseService;
     private final UserPhraseService userPhraseService;
+    private final LanguageLocalisation languageLocalisation;
 
 
     @Autowired
     public MessageHandler(ChatHandler chatSender,
                           UserService userService,
                           PhraseService phraseService,
-                          UserPhraseService userPhraseService) {
+                          UserPhraseService userPhraseService,
+                          LanguageLocalisation languageLocalisation) {
         this.chatHandler = chatSender;
         this.userService = userService;
         this.phraseService = phraseService;
         this.userPhraseService = userPhraseService;
+        this.languageLocalisation = languageLocalisation;
     }
 
     public void handleStartCommandReceived(Update update, Long chatId, PersonalVocabularyBot bot) throws UserNotFoundException {
@@ -111,12 +114,29 @@ public class MessageHandler {
         }
     }
 
+    public void handleLanguageChange(Update update, Long chatId, String text, PersonalVocabularyBot bot) throws UserNotFoundException {
+        User user = userService.findUserById(chatId);
+
+        if (text.equals(languageLocalisation.englishLang)) {
+            user.setLanguage("en");
+            languageLocalisation.setMessages(chatId, ResourceBundle.getBundle("messages", new Locale("en")));
+        } else if (text.equals(languageLocalisation.russianLang)) {
+            user.setLanguage("ru");
+            languageLocalisation.setMessages(chatId, ResourceBundle.getBundle("messages", new Locale("ru")));
+        }
+
+        executeSendingMessage(update, chatId, bot, "/lang");
+
+        user.setUserBotState(DEFAULT_STATE);
+        userService.saveUser(user);
+    }
+
     public void deletePhrase(PersonalVocabularyBot bot, Long chatId) throws UserNotFoundException, TelegramApiException {
         String phraseText = userService.getSavedPhrase(chatId);
         Long phraseId = userPhraseService.findPhraseIdByUserIdAndPhrase(chatId, phraseText);
         userPhraseService.deleteUserPhrase(chatId, phraseId);
 
-        List<String> phrases = userPhraseService.findUserPhrasesById(chatId);
+        List<String> phrases = userPhraseService.findUserPhrasesByIdOrderByPhraseId(chatId);
         phrases.remove(phraseText);
 
         User user = userService.findUserById(chatId);
@@ -137,7 +157,7 @@ public class MessageHandler {
     }
 
     private void handleValidPhrase(Update update, Long chatId, String text, PersonalVocabularyBot bot) throws UserNotFoundException {
-        List<String> userTextPhrases = userPhraseService.findUserPhrasesById(chatId);
+        List<String> userTextPhrases = userPhraseService.findUserPhrasesByIdOrderByPhraseId(chatId);
         boolean phraseFound = false;
 
         for (String userPhrase : userTextPhrases) {
@@ -208,20 +228,5 @@ public class MessageHandler {
 
             log.info("@" + userService.findUserById(currentUser.getUserId()).getNickname() + " saved their phrase");
         }
-    }
-
-    public void changeBotLanguage (Update update, Long chatId, String text, PersonalVocabularyBot bot) throws UserNotFoundException {
-        User user = userService.findUserById(chatId);
-
-        if (text.equals(LanguageLocalisation.englishLang)) {
-            LanguageLocalisation.messages = ResourceBundle.getBundle("messages", new Locale("en"));
-            executeSendingMessage(update, chatId, bot, "/eng_lang");
-        } else if (text.equals(LanguageLocalisation.russianLang)) {
-            LanguageLocalisation.messages = ResourceBundle.getBundle("messages", new Locale("ru"));
-            executeSendingMessage(update, chatId, bot, "/rus_lang");
-        }
-
-        user.setUserBotState(DEFAULT_STATE);
-        userService.saveUser(user);
     }
 }
