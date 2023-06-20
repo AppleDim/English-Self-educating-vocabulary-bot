@@ -7,6 +7,7 @@ import dmitry.polyakov.exceptions.UserNotFoundException;
 import dmitry.polyakov.models.User;
 import dmitry.polyakov.services.UserPhraseService;
 import dmitry.polyakov.services.UserService;
+import dmitry.polyakov.utils.LanguageLocalisation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -16,16 +17,14 @@ import org.telegram.telegrambots.meta.api.methods.send.SendSticker;
 import org.telegram.telegrambots.meta.api.methods.send.SendVoice;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.objects.Chat;
-import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.sql.Timestamp;
-import java.util.List;
-
-import static dmitry.polyakov.utils.LanguageLocalisation.messages;
+import java.util.LinkedList;
+import java.util.ResourceBundle;
 
 @Component
 @Slf4j
@@ -34,16 +33,20 @@ public class ChatHandler {
     private final UserPhraseService userPhraseService;
     private final InlineKeyboardFactory inlineKeyboardFactory;
     private final ReplyKeyboardFactory replyKeyboardFactory;
+    private final LanguageLocalisation languageLocalisation;
+
 
     @Autowired
     public ChatHandler(UserService userService,
                        UserPhraseService userPhraseService,
                        InlineKeyboardFactory inlineKeyboardFactory,
-                       ReplyKeyboardFactory replyKeyboardFactory) {
+                       ReplyKeyboardFactory replyKeyboardFactory,
+                       LanguageLocalisation languageLocalisation) {
         this.userService = userService;
         this.userPhraseService = userPhraseService;
         this.inlineKeyboardFactory = inlineKeyboardFactory;
         this.replyKeyboardFactory = replyKeyboardFactory;
+        this.languageLocalisation = languageLocalisation;
     }
 
     public void sendMessage(Update update, Long chatId, PersonalVocabularyBot bot, String text) throws TelegramApiException, UserNotFoundException {
@@ -51,17 +54,6 @@ public class ChatHandler {
         setSendingMessageReplyMarkup(sendMessage, chatId, bot);
 
         executeMessage(bot, sendMessage);
-    }
-
-    public void sendVoiceMessage(Update update, PersonalVocabularyBot bot) {
-        Long chatId = update.getMessage().getChatId();
-
-        SendVoice sendVoice = new SendVoice();
-        sendVoice.setVoice(new InputFile("file"));
-        sendVoice.setChatId(String.valueOf(chatId));
-        sendVoice.setParseMode(ParseMode.MARKDOWN);
-
-        executeMessage(bot, sendVoice);
     }
 
     public void deleteMessage(PersonalVocabularyBot bot, long chatId, int messageId) {
@@ -73,7 +65,7 @@ public class ChatHandler {
     }
 
     public void getPhrasesFromPage(PersonalVocabularyBot bot, long chatId) throws UserNotFoundException {
-        List<String> phrasesText = userPhraseService.findUserPhrasesById(chatId);
+        LinkedList<String> phrasesText = userPhraseService.findUserPhrasesByIdOrderByPhraseId(chatId);
         User user = userService.findUserById(chatId);
         int page = user.getCurrentPageNumber();
 
@@ -109,13 +101,23 @@ public class ChatHandler {
     }
 
     protected SendMessage createPhraseWatchingPage(Long chatId, String callBackData) {
+        ResourceBundle messages = languageLocalisation.getMessages(chatId);
         String phrase = callBackData.split(": ")[1];
         return createTextSendMessage(chatId,messages.getString("message.chosen_phrase") + "\n" + phrase);
     }
 
     protected SendMessage createDeleteConfirmationMessage(Long chatId) {
+        ResourceBundle messages = languageLocalisation.getMessages(chatId);
         SendMessage sendMessage = createTextSendMessage(chatId, messages.getString("message.confirm_deleting"));
         InlineKeyboardMarkup inlineKeyboardMarkup = inlineKeyboardFactory.createDeleteConfirmationInlineMarkup();
+        sendMessage.setReplyMarkup(inlineKeyboardMarkup);
+        return sendMessage;
+    }
+
+    protected SendMessage createSettingsPageMessage(Long chatId) {
+        ResourceBundle messages = languageLocalisation.getMessages(chatId);
+        SendMessage sendMessage = createTextSendMessage(chatId, messages.getString("settings.options_page"));
+        InlineKeyboardMarkup inlineKeyboardMarkup = inlineKeyboardFactory.createSettingsInlineMarkup();
         sendMessage.setReplyMarkup(inlineKeyboardMarkup);
         return sendMessage;
     }
@@ -136,14 +138,24 @@ public class ChatHandler {
         return sendMessage;
     }
 
-    private SendMessage createPhrasesPageMessage(long chatId, int page, int maxPage, List<String> phrasesText, int startIndex, int endIndex) {
-        StringBuilder sb = new StringBuilder();
+    private SendMessage createPhrasesPageMessage(long chatId, int page, int maxPage, LinkedList<String> phrasesText, int startIndex, int endIndex) {
+        ResourceBundle messages = languageLocalisation.getMessages(chatId);
+        StringBuilder sb = new StringBuilder(256);
+
         sb.append(EmojiParser.parseToUnicode(":page_facing_up:"))
-                .append(messages.getString("chat.page_number")).append(page + 1).append("/").append(maxPage).append(":\n")
+                .append(messages.getString("chat.page_number")).append(" ").append(page + 1).append("/").append(maxPage).append(":\n")
                 .append("-----------------------------------------\n");
 
         for (int i = startIndex; i < endIndex; i++) {
-            sb.append(i + 1).append(". ").append("*").append(phrasesText.get(i)).append("*").append("\n");
+            String phraseText = phrasesText.get(i);
+            int countPhraseViews = userPhraseService.getNumberPhraseViews(chatId, phraseText);
+            sb.append(i + 1).append(". ");
+            if (countPhraseViews == 0) {
+                sb.append("*").append(phraseText).append("*");
+            } else {
+                sb.append(phraseText);
+            }
+            sb.append(" ").append("(").append(countPhraseViews).append(")").append("\n");
         }
 
         return createTextSendMessage(chatId, sb.toString());
@@ -151,7 +163,7 @@ public class ChatHandler {
 
     private void setSendingMessageReplyMarkup(SendMessage sendMessage, Long chatId, PersonalVocabularyBot bot) throws UserNotFoundException {
         if (userService.isUserMatchedWithBotState(chatId, BotStateEnum.DEFAULT_STATE)) {
-            ReplyKeyboardMarkup replyKeyboardMarkup = replyKeyboardFactory.createMainKeyboardMarkup();
+            ReplyKeyboardMarkup replyKeyboardMarkup = replyKeyboardFactory.createMainKeyboardMarkup(chatId);
             sendMessage.setReplyMarkup(replyKeyboardMarkup);
         } else if (userService.isUserMatchedWithBotState(chatId, BotStateEnum.READING_DICTIONARY)) {
             getPhrasesFromPage(bot, chatId);
@@ -159,12 +171,14 @@ public class ChatHandler {
             ReplyKeyboardMarkup replyKeyboardMarkup = replyKeyboardFactory.createLanguageKeyboardMarkup();
             sendMessage.setReplyMarkup(replyKeyboardMarkup);
         } else {
-            ReplyKeyboardMarkup replyKeyboardMarkup = replyKeyboardFactory.createReturnToMenuKeyboardMarkup();
+            ReplyKeyboardMarkup replyKeyboardMarkup = replyKeyboardFactory.createReturnToMenuKeyboardMarkup(chatId);
             sendMessage.setReplyMarkup(replyKeyboardMarkup);
         }
     }
 
     private String textBuilder(Update update, Long chatId, String text) throws UserNotFoundException {
+        ResourceBundle messages = languageLocalisation.getMessages(chatId);
+
         switch (text) {
             case "/start" -> {
                 if (!userService.isUserFoundById(chatId)) {
@@ -188,10 +202,7 @@ public class ChatHandler {
             case "/language" -> {
                 return messages.getString("message.choose_language");
             }
-            case "/rus_lang" -> {
-                return messages.getString("message.lang_chosen");
-            }
-            case "/eng_lang" -> {
+            case "/lang" -> {
                 return messages.getString("message.lang_chosen");
             }
             case "/illegal_characters" -> {
