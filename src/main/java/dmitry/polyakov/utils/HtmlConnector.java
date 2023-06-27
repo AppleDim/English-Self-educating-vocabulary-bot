@@ -4,12 +4,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.helper.ValidationException;
 import org.jsoup.nodes.Document;
+import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 
+
 @Slf4j
-public class HtmlParser {
-    public Document connectToUrl(String url) {
+@Component
+public class HtmlConnector {
+    public Document getDocFromUrl(String url) {
         Document doc = null;
         try {
             doc = Jsoup.connect(url).get();
@@ -19,6 +22,4 @@ public class HtmlParser {
 
         return doc;
     }
-
-
 }
