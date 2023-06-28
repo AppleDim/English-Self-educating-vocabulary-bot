@@ -309,11 +309,13 @@ public class ChatHandler {
     }
 
     public String createEnglishPhraseMeaningText(Long chatId) throws UserNotFoundException {
+        ResourceBundle messages = languageLocalisation.getMessages(chatId);
         User user = userService.findUserById(chatId);
+
         Document doc = htmlConnector.getDocFromUrl("https://dictionary.cambridge.org/dictionary/english/" + user.getCurrentPhrase());
         Elements elements = doc.select(".ddef_h");
         if (elements.size() == 0) {
-            return "No definitions have been found";
+            return messages.getString("message.no_definitions_found");
         }
 
         StringBuilder sb = new StringBuilder();
