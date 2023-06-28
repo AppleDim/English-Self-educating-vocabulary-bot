@@ -2,7 +2,6 @@ package dmitry.polyakov.services;
 
 import com.vdurmont.emoji.EmojiParser;
 import dmitry.polyakov.bot.PersonalVocabularyBot;
-import dmitry.polyakov.constants.BotStateEnum;
 import dmitry.polyakov.exceptions.PhraseNotFoundException;
 import dmitry.polyakov.exceptions.UserNotFoundException;
 import dmitry.polyakov.handlers.CallbackHandler;
@@ -16,6 +15,8 @@ import org.telegram.telegrambots.meta.api.objects.*;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.util.ResourceBundle;
+
+import static dmitry.polyakov.constants.BotStateEnum.*;
 
 @Slf4j
 @Service
@@ -76,35 +77,35 @@ public class BotServiceImpl implements BotService {
         User user = userService.findUserById(chatId);
 
         if (command.equals("/help")) {
-            user.setUserBotState(BotStateEnum.DEFAULT_STATE);
+            user.setUserBotState(DEFAULT_STATE);
             userService.saveUser(user);
 
             commandHandler.handleHelpCommandReceived(update, chatId, bot);
 
         } else if (command.equals(EmojiParser.parseToUnicode(messages.getString("button.name.dictionary")
                 + ":scroll:"))
-                && user.getUserBotState().equals(BotStateEnum.DEFAULT_STATE)) {
-            user.setUserBotState(BotStateEnum.READING_DICTIONARY);
+                && user.getUserBotState().equals(DEFAULT_STATE)) {
+            user.setUserBotState(READING_DICTIONARY);
             userService.saveUser(user);
 
             commandHandler.handleDictionaryCommandReceived(chatId, bot);
 
         } else if (command.equals("/language")) {
-            user.setUserBotState(BotStateEnum.LANGUAGE_CHANGE);
+            user.setUserBotState(LANGUAGE_CHANGE);
             userService.saveUser(user);
             commandHandler.handleBotLanguageChange(update, chatId, bot);
 
         } else if (command.equals(EmojiParser.parseToUnicode(messages.getString("button.name.write")
                 + ":writing:"))
-                && user.getUserBotState().equals(BotStateEnum.DEFAULT_STATE)) {
-            user.setUserBotState(BotStateEnum.WRITING_WORDS);
+                && user.getUserBotState().equals(DEFAULT_STATE)) {
+            user.setUserBotState(WRITING_WORDS);
             userService.saveUser(user);
 
             commandHandler.handleWriteCommandReceived(update, chatId, bot);
 
         } else if (command.equals(EmojiParser.parseToUnicode(messages.getString("button.name.return")
-                + ":house:")) && !user.getUserBotState().equals(BotStateEnum.DEFAULT_STATE)) {
-            user.setUserBotState(BotStateEnum.DEFAULT_STATE);
+                + ":house:")) && !user.getUserBotState().equals(DEFAULT_STATE)) {
+            user.setUserBotState(DEFAULT_STATE);
             userService.saveUser(user);
 
             commandHandler.handleReturnButtonPressed(update, chatId, bot);
@@ -114,8 +115,12 @@ public class BotServiceImpl implements BotService {
             commandHandler.handleLanguageChange(update, chatId, command, bot);
             commandHandler.handleReturnButtonPressed(update, chatId, bot);
 
-        } else if (user.getUserBotState().equals(BotStateEnum.WRITING_WORDS)) {
+        } else if (user.getUserBotState().equals(WRITING_WORDS)) {
             commandHandler.handlePhraseReceived(update, chatId, command, bot);
+
+        } else if (user.getUserBotState().equals(SETTINGS_AMOUNT)) {
+            commandHandler.handlePhrasesNumberReceived(update, bot, chatId, command);
+            callbackHandler.handleReturnToMenu(update, bot, chatId);
         }
     }
 
@@ -134,8 +139,8 @@ public class BotServiceImpl implements BotService {
             case "SETTINGS_BUTTON" -> callbackHandler.handleSettingsButtonPressed(bot, chatId, messageId);
 
             case "CANCEL_BUTTON" -> {
-                if (user.getUserBotState().equals(BotStateEnum.READING_PHRASE)
-                        || user.getUserBotState().equals(BotStateEnum.SETTINGS)) {
+                if (user.getUserBotState().equals(READING_PHRASE)
+                        || user.getUserBotState().equals(SETTINGS)) {
                     commandHandler.handleCancelButtonWhileReadingPhrasePressed(bot, chatId, messageId);
                     commandHandler.handleDictionaryCommandReceived(chatId, bot);
                 } else
@@ -157,15 +162,22 @@ public class BotServiceImpl implements BotService {
             }
 
             case "NO_BUTTON" -> callbackHandler.handleNOButtonPressed(bot, chatId, messageId);
-            case "ORDER_BUTTON" -> {
 
-            }
-            case "AMOUNT_BUTTON" -> {
+            case "ORDER_BUTTON" -> callbackHandler.handleOrderButtonPressed(bot, chatId, messageId);
 
+            case "AMOUNT_BUTTON" -> callbackHandler.handleAmountButtonPressed(bot, chatId, messageId);
+
+            case "LEN_ASC_BUTTON", "LEN_DESC_BUTTON", "VIEWS_ASC_BUTTON", "VIEWS_DESC_BUTTON", "DATE_ASC_BUTTON", "DATE_DESC_BUTTON" -> {
+                callbackHandler.handleOrderOptionButtonPressed(callBackData, chatId);
+                callbackHandler.handleCancelButtonPressed(update, bot, chatId, messageId);
             }
+            case "ENGLISH_MEANINGS_BUTTON" -> commandHandler.handleEnglishMeaningsButtonPressed(bot, chatId, messageId);
+            case "SENTENCES_BUTTON" -> commandHandler.handleSentencesButtonPressed(bot, chatId, messageId);
 
         }
         if (callBackData.matches("[0-9]+: [a-zA-Z'\\-, ]+")) {
+            user.setCurrentPhrase(callBackData.split(": ")[1]);
+            userService.saveUser(user);
             userPhraseService.incrementCountPhraseViews(chatId, callBackData.split(": ")[1]);
             callbackHandler.handlePhraseNumberPressed(bot, chatId, messageId, callBackData);
         }

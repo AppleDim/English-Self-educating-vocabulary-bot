@@ -1,13 +1,12 @@
 package dmitry.polyakov.models;
 
 import dmitry.polyakov.constants.BotStateEnum;
+import dmitry.polyakov.constants.SettingsOrderEnum;
 import jakarta.transaction.Transactional;
 import lombok.*;
 import jakarta.persistence.*;
 import java.sql.Timestamp;
 import java.util.HashSet;
-import java.util.Locale;
-import java.util.ResourceBundle;
 import java.util.Set;
 
 @Entity
@@ -47,4 +46,11 @@ public class User {
 
     @Column(name = "language")
     private String language;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "phrase_sorting_state")
+    private SettingsOrderEnum phraseSortingState;
+
+    @Column(name = "phrases_per_page")
+    private int phrasesPerPage;
 }

@@ -18,14 +18,26 @@ public class UserPhraseService {
         this.userPhraseRepository = userPhraseRepository;
     }
 
-    public LinkedList<String> findUserPhrasesByIdOrderByPhraseId(Long userId) {
-        return userPhraseRepository.findUserPhrasesByUserIdOrderByPhraseId(userId);
+    public LinkedList<String> findUserPhrasesByIdOrderByPhraseIdAsc(Long userId) {
+        return userPhraseRepository.findUserPhrasesByUserIdOrderByPhraseIdAsc(userId);
+    }
+
+    public LinkedList<String> findUserPhrasesByIdOrderByPhraseIdDesc(Long userId) {
+        return userPhraseRepository.findUserPhrasesByUserIdOrderByPhraseIdDesc(userId);
+    }
+
+    public LinkedList<String> findUserPhrasesByIdOrderByCountPhraseViewsAsc(Long userId) {
+        return userPhraseRepository.findUserPhrasesByUserIdOrderByCountPhraseViewsAsc(userId);
     }
     public LinkedList<String> findUserPhrasesByIdOrderByCountPhraseViewsDesc(Long userId) {
         return userPhraseRepository.findUserPhrasesByUserIdOrderByCountPhraseViewsDesc(userId);
     }
     public LinkedList<String> findUserPhrasesByUserIdOrderByPhraseLengthAsc(Long userId) {
         return userPhraseRepository.findUserPhrasesByUserIdOrderByPhraseLengthAsc(userId);
+    }
+
+    public LinkedList<String> findUserPhrasesByUserIdOrderByPhraseLengthDesc(Long userId) {
+        return userPhraseRepository.findUserPhrasesByUserIdOrderByPhraseLengthDesc(userId);
     }
 
 
@@ -41,12 +53,8 @@ public class UserPhraseService {
         return userPhraseRepository.existsByUserUserIdAndPhrasePhraseId(userId, phraseId);
     }
 
-    public String findSingleUserPhrase(Long userId, Long phraseId) {
-        return userPhraseRepository.findSpecificUserPhrasesByUserIdAndPhraseIds(userId, phraseId);
-    }
-
     public int countUserPhrases(Long userId) {
-        return findUserPhrasesByIdOrderByPhraseId(userId).size();
+        return findUserPhrasesByIdOrderByPhraseIdAsc(userId).size();
     }
 
     @Transactional
@@ -56,10 +64,6 @@ public class UserPhraseService {
 
     public Long findPhraseIdByUserIdAndPhrase(Long userId, String phraseText) {
         return userPhraseRepository.findPhraseIdByUserIdAndPhrase(userId, phraseText);
-    }
-
-    public UserPhrase findUserPhraseByIds(Long userId, Long phraseId) {
-        return userPhraseRepository.findUserPhraseByUserIdAndPhraseId(userId, phraseId);
     }
 
     public int getNumberPhraseViews(Long userId, String phraseText) {

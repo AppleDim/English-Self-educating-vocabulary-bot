@@ -18,7 +18,8 @@ CREATE TABLE telegram.users
     first_name      VARCHAR(255) NOT NULL,
     nickname        VARCHAR(255) NOT NULL,
     registered_date TIMESTAMP    NOT NULL,
-    user_bot_state  VARCHAR(255)
+    user_bot_state  VARCHAR(255),
+    phrase_sorting_state  VARCHAR(255)
 );
 
 CREATE TABLE telegram.phrases

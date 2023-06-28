@@ -1,6 +1,5 @@
 package dmitry.polyakov.services;
 
-import dmitry.polyakov.exceptions.PhraseNotFoundException;
 import dmitry.polyakov.models.Phrase;
 import dmitry.polyakov.repositories.PhraseRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,9 +22,5 @@ public class PhraseService {
 
     public List<Phrase> getAllPhrases() {
         return phraseRepository.findAll();
-    }
-
-    public Phrase findPhraseById(Long phraseId) throws PhraseNotFoundException {
-        return phraseRepository.findById(phraseId).orElseThrow(() -> new PhraseNotFoundException(phraseId));
     }
 }

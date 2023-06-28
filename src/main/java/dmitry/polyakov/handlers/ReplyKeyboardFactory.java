@@ -53,6 +53,20 @@ public class ReplyKeyboardFactory {
         return replyKeyboardMarkup;
     }
 
+    private List<KeyboardRow> createMainKeyboard(ResourceBundle messages) {
+        List<KeyboardRow> keyboardRows = new ArrayList<>();
+        KeyboardRow row = new KeyboardRow();
+        KeyboardButton writeButton = new KeyboardButton(EmojiParser.parseToUnicode(messages.getString("button.name.write")
+                + ":writing:"));
+        KeyboardButton dictionaryButton = new KeyboardButton(EmojiParser.parseToUnicode(messages.getString("button.name.dictionary")
+                + ":scroll:"));
+        row.add(writeButton);
+        row.add(dictionaryButton);
+        keyboardRows.add(row);
+
+        return keyboardRows;
+    }
+
     private KeyboardRow createLanguageRow() {
         KeyboardRow row = new KeyboardRow();
 
@@ -77,19 +91,5 @@ public class ReplyKeyboardFactory {
         row.add(returnButton);
 
         return row;
-    }
-
-    private List<KeyboardRow> createMainKeyboard(ResourceBundle messages) {
-        List<KeyboardRow> keyboardRows = new ArrayList<>();
-        KeyboardRow row = new KeyboardRow();
-        KeyboardButton writeButton = new KeyboardButton(EmojiParser.parseToUnicode(messages.getString("button.name.write")
-                + ":writing:"));
-        KeyboardButton dictionaryButton = new KeyboardButton(EmojiParser.parseToUnicode(messages.getString("button.name.dictionary")
-                + ":scroll:"));
-        row.add(writeButton);
-        row.add(dictionaryButton);
-        keyboardRows.add(row);
-
-        return keyboardRows;
     }
 }

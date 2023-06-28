@@ -1,40 +1,46 @@
 package dmitry.polyakov.handlers;
 
 import com.vdurmont.emoji.EmojiParser;
+import dmitry.polyakov.exceptions.UserNotFoundException;
 import dmitry.polyakov.models.User;
+import dmitry.polyakov.services.UserService;
+import dmitry.polyakov.utils.HtmlConnector;
+import dmitry.polyakov.utils.LanguageLocalisation;
+import org.jsoup.nodes.Document;
+import org.jsoup.select.Elements;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 @Component
 public class InlineKeyboardFactory {
-    protected InlineKeyboardMarkup createDeletePageInlineKeyboardMarkup() {
-        InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
-        List<List<InlineKeyboardButton>> inlineKeyboard = new ArrayList<>();
-        List<InlineKeyboardButton> row = new ArrayList<>();
+    private final UserService userService;
+    private final LanguageLocalisation languageLocalisation;
+    private final HtmlConnector htmlConnector;
 
-        InlineKeyboardButton cancelButton = createInlineKeyboardButton(":house:", "CANCEL_BUTTON");
-        InlineKeyboardButton deleteButton = createInlineKeyboardButton(":x:", "DELETE_BUTTON");
-
-        row.add(deleteButton);
-        row.add(cancelButton);
-
-        inlineKeyboard.add(row);
-        inlineKeyboardMarkup.setKeyboard(inlineKeyboard);
-
-        return inlineKeyboardMarkup;
+    @Autowired
+    public InlineKeyboardFactory(UserService userService,
+                                 LanguageLocalisation languageLocalisation,
+                                 HtmlConnector htmlConnector) {
+        this.userService = userService;
+        this.languageLocalisation = languageLocalisation;
+        this.htmlConnector = htmlConnector;
     }
+
     public InlineKeyboardMarkup createSettingsInlineMarkup() {
         InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> inlineKeyboard = new ArrayList<>();
         List<InlineKeyboardButton> row = new ArrayList<>();
 
-        InlineKeyboardButton orderButton = createInlineKeyboardButton("order", "ORDER_BUTTON");
-        InlineKeyboardButton cancelButton = createInlineKeyboardButton(EmojiParser.parseToUnicode(":house:"), "CANCEL_BUTTON");
-        InlineKeyboardButton amountButton = createInlineKeyboardButton("amount", "AMOUNT_BUTTON");
+        InlineKeyboardButton orderButton =
+                createInlineKeyboardButton(EmojiParser.parseToUnicode(":twisted_rightwards_arrows:"), "ORDER_BUTTON");
+        InlineKeyboardButton cancelButton =
+                createInlineKeyboardButton(EmojiParser.parseToUnicode(":house:"), "CANCEL_BUTTON");
+        InlineKeyboardButton amountButton =
+                createInlineKeyboardButton(EmojiParser.parseToUnicode(":arrows_clockwise:"), "AMOUNT_BUTTON");
 
         row.add(orderButton);
         row.add(cancelButton);
@@ -46,7 +52,7 @@ public class InlineKeyboardFactory {
         return inlineKeyboardMarkup;
     }
 
-    protected InlineKeyboardMarkup createDeleteConfirmationInlineMarkup() {
+    protected InlineKeyboardMarkup createPhrasesPageInlineMarkup() {
         InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> inlineKeyboard = new ArrayList<>();
         List<InlineKeyboardButton> currentRow = new ArrayList<>();
@@ -63,30 +69,83 @@ public class InlineKeyboardFactory {
         return inlineKeyboardMarkup;
     }
 
-    protected InlineKeyboardMarkup createDeleteConfirmationInlineMarkup(List<String> phrasesText, User user, int startIndex, int endIndex) {
+    protected InlineKeyboardMarkup createPhrasesPageInlineMarkup(List<String> phrasesText, User user, int startIndex, int endIndex) {
         InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> inlineKeyboard = new ArrayList<>();
         putGeneralDictionaryButtons(inlineKeyboard);
-        List<InlineKeyboardButton> currentRow = new ArrayList<>();
 
         int elementsPerRow = 5;
-        int currentRowElements = 0;
+        List<InlineKeyboardButton> currentRow = new ArrayList<>();
 
         for (int i = startIndex; i < endIndex; i++) {
             InlineKeyboardButton button = createPhraseInlineKeyboardButton(user, phrasesText, i);
             currentRow.add(button);
-            currentRowElements++;
 
-            if (currentRowElements == elementsPerRow || i == endIndex - 1) {
+            if (currentRow.size() == elementsPerRow || i == endIndex - 1) {
                 inlineKeyboard.add(currentRow);
                 currentRow = new ArrayList<>();
-                currentRowElements = 0;
             }
         }
 
         inlineKeyboardMarkup.setKeyboard(inlineKeyboard);
         return inlineKeyboardMarkup;
     }
+
+    protected InlineKeyboardMarkup createOrderInlineMarkup(Long chatId) {
+        ResourceBundle messages = languageLocalisation.getMessages(chatId);
+        InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> inlineKeyboard = new ArrayList<>();
+
+        inlineKeyboard.add(Collections.singletonList(createInlineKeyboardButton(EmojiParser.parseToUnicode(":house:"), "CANCEL_BUTTON")));
+        inlineKeyboard.add(Arrays.asList(
+                createInlineKeyboardButton(messages.getString("button.length.ascending"), "LEN_ASC_BUTTON"),
+                createInlineKeyboardButton(messages.getString("button.length.descending"), "LEN_DESC_BUTTON")
+        ));
+        inlineKeyboard.add(Arrays.asList(
+                createInlineKeyboardButton(messages.getString("button.views.ascending"), "VIEWS_ASC_BUTTON"),
+                createInlineKeyboardButton(messages.getString("button.views.descending"), "VIEWS_DESC_BUTTON")
+        ));
+        inlineKeyboard.add(Arrays.asList(
+                createInlineKeyboardButton(messages.getString("button.date.ascending"), "DATE_ASC_BUTTON"),
+                createInlineKeyboardButton(messages.getString("button.date.descending"), "DATE_DESC_BUTTON")
+        ));
+
+        inlineKeyboardMarkup.setKeyboard(inlineKeyboard);
+        return inlineKeyboardMarkup;
+    }
+
+    protected InlineKeyboardMarkup createEnglishInlineKeyboard(Long chatId) throws UserNotFoundException {
+        User user = userService.findUserById(chatId);
+        InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> inlineKeyboard = new ArrayList<>();
+
+        Document doc1 = htmlConnector.getDocFromUrl("https://dictionary.cambridge.org/dictionary/english/" + user.getCurrentPhrase());
+        Elements elements = doc1.select(".ddef_h");
+        if (elements.size() != 0) {
+            InlineKeyboardButton button1 = createInlineKeyboardButton("meanings", "ENGLISH_MEANINGS_BUTTON");
+            inlineKeyboard.add(Collections.singletonList(button1));
+        }
+
+        Document doc = htmlConnector.getDocFromUrl("https://context.reverso.net/translation/english-russian/" + user.getCurrentPhrase());
+        if (doc != null) {
+            InlineKeyboardButton button2 = createInlineKeyboardButton("english-russian sentences", "SENTENCES_BUTTON");
+            inlineKeyboard.add(Collections.singletonList(button2));
+        }
+
+        inlineKeyboard.add(createPhraseGeneralRow());
+        inlineKeyboardMarkup.setKeyboard(inlineKeyboard);
+
+        return inlineKeyboardMarkup;
+    }
+
+    protected InlineKeyboardMarkup createPhraseWatchingInlineMarkup() {
+        InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> inlineKeyboard = new ArrayList<>();
+        inlineKeyboard.add(createPhraseGeneralRow());
+        inlineKeyboardMarkup.setKeyboard(inlineKeyboard);
+        return inlineKeyboardMarkup;
+    }
+
 
     private InlineKeyboardButton createInlineKeyboardButton(String text, String callbackData) {
         InlineKeyboardButton button = new InlineKeyboardButton();
@@ -105,43 +164,25 @@ public class InlineKeyboardFactory {
     }
 
     private void putGeneralDictionaryButtons(List<List<InlineKeyboardButton>> rowsInline) {
-        InlineKeyboardButton fastBackButton = new InlineKeyboardButton();
-        fastBackButton.setText(EmojiParser.parseToUnicode(":rewind:"));
-        fastBackButton.setCallbackData("FAST_BACK_BUTTON");
+        rowsInline.add(Arrays.asList(
+                createInlineKeyboardButton(":rewind:", "FAST_BACK_BUTTON"),
+                createInlineKeyboardButton(":arrow_left:", "BACK_BUTTON"),
+                createInlineKeyboardButton(":gear:", "SETTINGS_BUTTON"),
+                createInlineKeyboardButton(":house:", "CANCEL_BUTTON"),
+                createInlineKeyboardButton(":mag:", "SEARCHING_BUTTON"),
+                createInlineKeyboardButton(":arrow_right:", "FORWARD_BUTTON"),
+                createInlineKeyboardButton(":fast_forward:", "FAST_FORWARD_BUTTON")
+        ));
+    }
 
-        InlineKeyboardButton backButton = new InlineKeyboardButton();
-        backButton.setText(EmojiParser.parseToUnicode(":arrow_left:"));
-        backButton.setCallbackData("BACK_BUTTON");
+    private List<InlineKeyboardButton> createPhraseGeneralRow() {
+        List<InlineKeyboardButton> row = new ArrayList<>();
+        InlineKeyboardButton cancelButton = createInlineKeyboardButton(":house:", "CANCEL_BUTTON");
+        InlineKeyboardButton deleteButton = createInlineKeyboardButton(":x:", "DELETE_BUTTON");
 
-        InlineKeyboardButton settingsButton = new InlineKeyboardButton();
-        settingsButton.setText(EmojiParser.parseToUnicode(":gear:"));
-        settingsButton.setCallbackData("SETTINGS_BUTTON");
+        row.add(deleteButton);
+        row.add(cancelButton);
 
-        InlineKeyboardButton cancelButton = new InlineKeyboardButton();
-        cancelButton.setText(EmojiParser.parseToUnicode(":house:"));
-        cancelButton.setCallbackData("CANCEL_BUTTON");
-
-        InlineKeyboardButton searchingButton = new InlineKeyboardButton();
-        searchingButton.setText(EmojiParser.parseToUnicode(":mag:"));
-        searchingButton.setCallbackData("SEARCHING_BUTTON");
-
-        InlineKeyboardButton forwardButton = new InlineKeyboardButton();
-        forwardButton.setText(EmojiParser.parseToUnicode(":arrow_right:"));
-        forwardButton.setCallbackData("FORWARD_BUTTON");
-
-        InlineKeyboardButton fastForwardButton = new InlineKeyboardButton();
-        fastForwardButton.setText(EmojiParser.parseToUnicode(":fast_forward:"));
-        fastForwardButton.setCallbackData("FAST_FORWARD_BUTTON");
-
-        List<InlineKeyboardButton> rowInLine = new ArrayList<>();
-        rowInLine.add(fastBackButton);
-        rowInLine.add(backButton);
-        rowInLine.add(settingsButton);
-        rowInLine.add(cancelButton);
-        rowInLine.add(searchingButton);
-        rowInLine.add(forwardButton);
-        rowInLine.add(fastForwardButton);
-
-        rowsInline.add(rowInLine);
+        return row;
     }
 }

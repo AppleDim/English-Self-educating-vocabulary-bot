@@ -2,6 +2,7 @@ package dmitry.polyakov.handlers;
 
 import dmitry.polyakov.bot.PersonalVocabularyBot;
 import dmitry.polyakov.constants.BotStateEnum;
+import dmitry.polyakov.constants.SettingsOrderEnum;
 import dmitry.polyakov.exceptions.UserNotFoundException;
 import dmitry.polyakov.models.User;
 import dmitry.polyakov.services.UserPhraseService;
@@ -10,7 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.util.LinkedList;
@@ -21,15 +21,13 @@ public class CallbackHandler {
     private final UserService userService;
     private final UserPhraseService userPhraseService;
     private final ChatHandler chatHandler;
-    private final InlineKeyboardFactory inlineKeyboardFactory;
+
     public CallbackHandler(UserService userService,
                            UserPhraseService userPhraseService,
-                           ChatHandler chatSender,
-                           InlineKeyboardFactory inlineKeyboardFactory) {
+                           ChatHandler chatSender) {
         this.userService = userService;
         this.userPhraseService = userPhraseService;
         this.chatHandler = chatSender;
-        this.inlineKeyboardFactory = inlineKeyboardFactory;
     }
 
     public void handleFastBackButtonPressed(PersonalVocabularyBot bot, long chatId, int messageId) throws UserNotFoundException {
@@ -46,7 +44,7 @@ public class CallbackHandler {
 
         userService.saveUser(user);
 
-        chatHandler.getPhrasesFromPage(bot, chatId);
+        chatHandler.sendPhrasesPage(bot, chatId);
 
         log.info("@" + userService.findUserById(chatId).getNickname() + " scrolled 10 pages back to the page: " + user.getCurrentPageNumber());
     }
@@ -65,7 +63,7 @@ public class CallbackHandler {
 
         userService.saveUser(user);
 
-        chatHandler.getPhrasesFromPage(bot, chatId);
+        chatHandler.sendPhrasesPage(bot, chatId);
 
         log.info("@" + userService.findUserById(chatId).getNickname() + " scrolled to the previous page: " + user.getCurrentPageNumber());
     }
@@ -79,6 +77,8 @@ public class CallbackHandler {
 
         SendMessage sendMessage = chatHandler.createSettingsPageMessage(chatId);
         chatHandler.executeMessage(bot, sendMessage);
+
+        log.info("@" + userService.findUserById(chatId).getNickname() + " went to the settings page");
     }
 
     public void handleCancelButtonPressed(Update update, PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException, TelegramApiException {
@@ -90,31 +90,31 @@ public class CallbackHandler {
 
         chatHandler.sendMessage(update, chatId, bot, "/return_to_main_menu");
 
-        log.info("@" + userService.findUserById(chatId).getNickname() + " returned to the main");
+        log.info("@" + userService.findUserById(chatId).getNickname() + " returned to the main menu");
     }
 
     public void handleSearchingButtonPressed(Update update, PersonalVocabularyBot bot, long chatId) throws UserNotFoundException {
         User user = userService.findUserById(chatId);
         user.setUserBotState(BotStateEnum.SETTINGS);
         userService.saveUser(user);
-        chatHandler.getPhrasesFromPage(bot, chatId);
+        chatHandler.sendPhrasesPage(bot, chatId);
     }
 
     public void handleForwardButtonPressed(PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException {
         chatHandler.deleteMessage(bot, chatId, messageId);
 
         User user = userService.findUserById(chatId);
-        int maxPage = (int) Math.ceil((double) userPhraseService.countUserPhrases(chatId) / 10);
+        int maxPage = (int) Math.ceil((double) userPhraseService.countUserPhrases(chatId) / user.getPhrasesPerPage());
         int currentPage = user.getCurrentPageNumber();
 
         if (currentPage < maxPage - 1) {
             user.setCurrentPageNumber(currentPage + 1);
-        } else {
+        } else if (maxPage > 0){
             user.setCurrentPageNumber(maxPage - 1);
         }
         userService.saveUser(user);
 
-        chatHandler.getPhrasesFromPage(bot, chatId);
+        chatHandler.sendPhrasesPage(bot, chatId);
 
         log.info("@" + userService.findUserById(chatId).getNickname() + " scrolled to the next page: " + currentPage);
     }
@@ -123,47 +123,41 @@ public class CallbackHandler {
         chatHandler.deleteMessage(bot, chatId, messageId);
 
         User user = userService.findUserById(chatId);
-        int maxPage = (int) Math.ceil((double) userPhraseService.countUserPhrases(chatId) / 10);
+        int maxPage = (int) Math.ceil((double) userPhraseService.countUserPhrases(chatId) / user.getPhrasesPerPage());
         int currentPage = user.getCurrentPageNumber();
 
         if (currentPage < maxPage - 10) {
             user.setCurrentPageNumber(currentPage + 10);
-        } else {
+        } else if (maxPage > 0){
             user.setCurrentPageNumber(maxPage - 1);
         }
 
         userService.saveUser(user);
 
-        chatHandler.getPhrasesFromPage(bot, chatId);
+        chatHandler.sendPhrasesPage(bot, chatId);
 
         log.info("@" + userService.findUserById(chatId).getNickname() + " scrolled 10 pages forward to the page: " + user.getCurrentPageNumber());
     }
 
-
     public void handlePhraseNumberPressed(PersonalVocabularyBot bot, Long chatId, int messageId, String callBackData) throws UserNotFoundException {
         chatHandler.deleteMessage(bot, chatId, messageId);
         User user = userService.findUserById(chatId);
-        LinkedList<String> phrasesText = userPhraseService.findUserPhrasesByIdOrderByPhraseId(chatId);
+        LinkedList<String> phrasesText = chatHandler.retrievePhrasesByOrder(chatId);
 
-        String phrase = "";
 
         for (String str : phrasesText) {
             if (isChosenPhrase(callBackData, user, str)) {
-                phrase = str;
                 user.setUserBotState(BotStateEnum.READING_PHRASE);
                 userService.saveUser(user);
 
-                InlineKeyboardMarkup inlineKeyboardMarkup = inlineKeyboardFactory.createDeletePageInlineKeyboardMarkup();
                 SendMessage sendMessage = chatHandler.createPhraseWatchingPage(chatId, callBackData);
-                sendMessage.setReplyMarkup(inlineKeyboardMarkup);
                 chatHandler.executeMessage(bot, sendMessage);
+
+                log.info("@" + user.getNickname() + " opened the page with the phrase: " + str);
                 break;
             }
         }
-
-        log.info("@" + user.getNickname() + " opened the page with the phrase: " + phrase);
     }
-
 
     public void handleDeletePhraseButtonPressed(PersonalVocabularyBot bot, Long chatId, int messageId) {
         chatHandler.deleteMessage(bot, chatId, messageId);
@@ -172,7 +166,7 @@ public class CallbackHandler {
     }
 
     public void handleNOButtonPressed(PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException {
-        chatHandler.getPhrasesFromPage(bot, chatId);
+        chatHandler.sendPhrasesPage(bot, chatId);
         chatHandler.deleteMessage(bot, chatId, messageId);
 
         User user = userService.findUserById(chatId);
@@ -180,6 +174,59 @@ public class CallbackHandler {
         userService.saveUser(user);
 
         log.info("@" + userService.findUserById(chatId).getNickname() + " canceled delete of phrase");
+    }
+
+    public void handleOrderButtonPressed(PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException {
+        chatHandler.deleteMessage(bot, chatId, messageId);
+
+        User user = userService.findUserById(chatId);
+        user.setUserBotState(BotStateEnum.SETTINGS_ORDER);
+        userService.saveUser(user);
+
+        SendMessage sendMessage = chatHandler.createSettingsOrderMessage(chatId);
+        chatHandler.executeMessage(bot, sendMessage);
+
+        log.info("@" + userService.findUserById(chatId).getNickname() + " pressed order button");
+    }
+
+    public void handleAmountButtonPressed(PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException {
+        chatHandler.deleteMessage(bot, chatId, messageId);
+
+        User user = userService.findUserById(chatId);
+        user.setUserBotState(BotStateEnum.SETTINGS_AMOUNT);
+        userService.saveUser(user);
+
+        SendMessage sendMessage = chatHandler.createSettingsAmountMessage(chatId);
+        chatHandler.executeMessage(bot, sendMessage);
+
+        log.info("@" + userService.findUserById(chatId).getNickname() + " pressed amount button");
+    }
+
+    public void handleOrderOptionButtonPressed(String callbackData, Long chatId) throws UserNotFoundException {
+        User user = userService.findUserById(chatId);
+
+        switch (callbackData) {
+            case "LEN_ASC_BUTTON" -> user.setPhraseSortingState(SettingsOrderEnum.PHRASE_LENGTH_ASC);
+            case "LEN_DESC_BUTTON" ->user.setPhraseSortingState(SettingsOrderEnum.PHRASE_LENGTH_DESC);
+            case "VIEWS_ASC_BUTTON" -> user.setPhraseSortingState(SettingsOrderEnum.PHRASE_VIEWS_ASC);
+            case "VIEWS_DESC_BUTTON" -> user.setPhraseSortingState(SettingsOrderEnum.PHRASE_VIEWS_DESC);
+            case "DATE_ASC_BUTTON" -> user.setPhraseSortingState(SettingsOrderEnum.PHRASE_ID_ASC);
+            case "DATE_DESC_BUTTON" -> user.setPhraseSortingState(SettingsOrderEnum.PHRASE_ID_DESC);
+        }
+
+        user.setCurrentPageNumber(0);
+        user.setUserBotState(BotStateEnum.DEFAULT_STATE);
+        userService.saveUser(user);
+    }
+
+    public void handleReturnToMenu(Update update, PersonalVocabularyBot bot, Long chatId) throws UserNotFoundException, TelegramApiException {
+        User user = userService.findUserById(chatId);
+        user.setUserBotState(BotStateEnum.DEFAULT_STATE);
+        userService.saveUser(user);
+
+        chatHandler.sendMessage(update, chatId, bot, "/return_to_main_menu");
+
+        log.info("@" + userService.findUserById(chatId).getNickname() + " returned to the main menu");
     }
 
     private boolean isChosenPhrase(String callBackData, User user, String phrase) {

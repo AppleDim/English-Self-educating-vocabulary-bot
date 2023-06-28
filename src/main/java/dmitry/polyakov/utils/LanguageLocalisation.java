@@ -28,7 +28,8 @@ public class LanguageLocalisation {
         userMessages.put(userId, messages);
     }
 
-    public  Locale getLocaleForUser(Long userId) {
+    @SuppressWarnings("deprecation")
+    public Locale getLocaleForUser(Long userId) {
         String language = userService.getLanguage(userId);
         return new Locale(Objects.requireNonNullElse(language, "en"));
     }

@@ -14,6 +14,7 @@ import dmitry.polyakov.utils.LanguageLocalisation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
@@ -30,7 +31,6 @@ public class MessageHandler {
     private final PhraseService phraseService;
     private final UserPhraseService userPhraseService;
     private final LanguageLocalisation languageLocalisation;
-
 
     @Autowired
     public MessageHandler(ChatHandler chatSender,
@@ -66,7 +66,7 @@ public class MessageHandler {
     }
 
     public void handleDictionaryCommandReceived(Long chatId, PersonalVocabularyBot bot) throws UserNotFoundException, TelegramApiException {
-        chatHandler.getPhrasesFromPage(bot, chatId);
+        chatHandler.sendPhrasesPage(bot, chatId);
 
         log.info("@" + userService.findUserById(chatId).getNickname() + " executed /dictionary command.");
     }
@@ -101,7 +101,7 @@ public class MessageHandler {
         user.setUserBotState(BotStateEnum.READING_DICTIONARY);
         userService.saveUser(user);
 
-        log.info("@" + userService.findUserById(chatId).getNickname() + " returned their dictionary page");
+        log.info("@" + userService.findUserById(chatId).getNickname() + " returned to their dictionary page");
     }
 
     public void handlePhraseReceived(Update update, Long chatId, String text, PersonalVocabularyBot bot) throws UserNotFoundException, PhraseNotFoundException {
@@ -114,6 +114,7 @@ public class MessageHandler {
         }
     }
 
+    @SuppressWarnings("deprecation")
     public void handleLanguageChange(Update update, Long chatId, String text, PersonalVocabularyBot bot) throws UserNotFoundException {
         User user = userService.findUserById(chatId);
 
@@ -136,7 +137,7 @@ public class MessageHandler {
         Long phraseId = userPhraseService.findPhraseIdByUserIdAndPhrase(chatId, phraseText);
         userPhraseService.deleteUserPhrase(chatId, phraseId);
 
-        List<String> phrases = userPhraseService.findUserPhrasesByIdOrderByPhraseId(chatId);
+        List<String> phrases = chatHandler.retrievePhrasesByOrder(chatId);
         phrases.remove(phraseText);
 
         User user = userService.findUserById(chatId);
@@ -146,6 +147,47 @@ public class MessageHandler {
         handleDictionaryCommandReceived(chatId, bot);
     }
 
+    public void handlePhrasesNumberReceived(Update update, PersonalVocabularyBot bot, Long chatId, String text) throws UserNotFoundException {
+        User user = userService.findUserById(chatId);
+        try {
+            if (Integer.parseInt(text) % 5 == 0 && Integer.parseInt(text) >= 5 && Integer.parseInt(text) <= 50) {
+                user.setPhrasesPerPage(Integer.parseInt(text));
+                user.setCurrentPageNumber(0);
+                executeSendingMessage(update, chatId, bot, "/number_saved");
+                userService.saveUser(user);
+                log.info("@" + userService.findUserById(user.getUserId()).getNickname() + " entered a number for displaying phrases per page: " + text);
+            }
+        } catch (NumberFormatException e) {
+            executeSendingMessage(update, chatId, bot, "/invalid_number_entered");
+            log.warn("@" + userService.findUserById(user.getUserId()).getNickname() + " entered an invalid number.");
+        }
+    }
+
+    public void handleEnglishMeaningsButtonPressed(PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException {
+        chatHandler.deleteMessage(bot, chatId, messageId);
+        ResourceBundle messages = languageLocalisation.getMessages(chatId);
+        User user = userService.findUserById(chatId);
+        String phrase = user.getCurrentPhrase();
+        String text = messages.getString("message.chosen_phrase") + "\n" + "*" + phrase + "*" + "\n\n" +
+                chatHandler.createEnglishPhraseMeaningText(chatId);
+        SendMessage sendMessage = chatHandler.createPhraseWatchingMessage(chatId, text);
+        chatHandler.executeMessage(bot, sendMessage);
+
+        log.info("@" + user.getNickname() + " opened the page with meanings of phrase " + phrase);
+    }
+
+    public void handleSentencesButtonPressed(PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException {
+        chatHandler.deleteMessage(bot, chatId, messageId);
+        ResourceBundle messages = languageLocalisation.getMessages(chatId);
+        User user = userService.findUserById(chatId);
+        String phrase = user.getCurrentPhrase();
+        String text = messages.getString("message.chosen_phrase") + "\n" + "*" + phrase + "*" + "\n\n" +
+                chatHandler.createSentencesWithPhrase(chatId);
+        SendMessage sendMessage = chatHandler.createPhraseWatchingMessage(chatId, text);
+        chatHandler.executeMessage(bot, sendMessage);
+
+        log.info("@" + user.getNickname() + " opened the page with sentences with " + phrase);
+    }
     private void executeSendingMessage(Update update, Long chatId, PersonalVocabularyBot bot, String text) {
         try {
             chatHandler.sendMessage(update, chatId, bot, text);
@@ -157,7 +199,7 @@ public class MessageHandler {
     }
 
     private void handleValidPhrase(Update update, Long chatId, String text, PersonalVocabularyBot bot) throws UserNotFoundException {
-        List<String> userTextPhrases = userPhraseService.findUserPhrasesByIdOrderByPhraseId(chatId);
+        List<String> userTextPhrases = chatHandler.retrievePhrasesByOrder(chatId);
         boolean phraseFound = false;
 
         for (String userPhrase : userTextPhrases) {
@@ -180,6 +222,7 @@ public class MessageHandler {
 
     private void handleInvalidPhrase(Update update, Long chatId, PersonalVocabularyBot bot) throws UserNotFoundException {
         executeSendingMessage(update, chatId, bot, "/illegal_characters");
+
         log.warn("@" + userService.findUserById(chatId).getNickname() + " tried to find a phrase with illegal characters");
     }
 
@@ -201,8 +244,9 @@ public class MessageHandler {
             phrase.setPhraseId(maxPhraseId + 1);
         }
 
-        log.info("@" + userService.findUserById(currentUser.getUserId()).getNickname() + " saved their phrase: " + phrase.getPhrase());
         phraseService.savePhrase(phrase);
+
+        log.info("@" + userService.findUserById(currentUser.getUserId()).getNickname() + " saved their phrase: " + phrase.getPhrase());
 
         return phrase;
     }
