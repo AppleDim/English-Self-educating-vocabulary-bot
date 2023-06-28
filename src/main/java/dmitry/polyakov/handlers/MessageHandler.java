@@ -240,7 +240,7 @@ public class MessageHandler {
         if (phraseService.getAllPhrases().isEmpty()) {
             phrase.setPhraseId(1L);
         } else {
-            long maxPhraseId = phraseService.getAllPhrases().size();
+            long maxPhraseId = phraseService.getMaxId();
             phrase.setPhraseId(maxPhraseId + 1);
         }
 
@@ -254,19 +254,14 @@ public class MessageHandler {
     private void saveUserPhrase(Long chatId, Phrase phrase) throws UserNotFoundException {
         User currentUser = userService.findUserById(chatId);
 
-        UserPhrase userPhrase = new UserPhrase();
-        userPhrase.setUser(currentUser);
-        userPhrase.setPhrase(phrase);
-
         boolean userPhraseExists = userPhraseService.findUserPhraseExists(currentUser.getUserId(), phrase.getPhraseId());
 
         if (!userPhraseExists) {
-            if (userPhraseService.findAllUsersPhrases().isEmpty()) {
-                userPhrase.setUserPhraseId(1L);
-            } else {
-                long maxUserPhraseId = userPhraseService.findAllUsersPhrases().size();
-                userPhrase.setUserPhraseId(maxUserPhraseId + 1);
-            }
+            UserPhrase userPhrase = new UserPhrase();
+            userPhrase.setUser(currentUser);
+            userPhrase.setPhrase(phrase);
+            Long maxUserPhraseId = userPhraseService.findMaxId();
+            userPhrase.setUserPhraseId(maxUserPhraseId != null ? maxUserPhraseId + 1 : 1);
 
             userPhraseService.saveUserPhrase(userPhrase);
 
