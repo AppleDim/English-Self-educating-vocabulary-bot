@@ -79,4 +79,7 @@ public class UserPhraseService {
         userPhrase.setCountPhraseViews(userPhrase.getCountPhraseViews() + 1);
         userPhraseRepository.save(userPhrase);
     }
+    public Long findMaxId() {
+        return userPhraseRepository.findMaxId();
+    }
 }

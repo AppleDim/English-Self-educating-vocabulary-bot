@@ -23,4 +23,8 @@ public class PhraseService {
     public List<Phrase> getAllPhrases() {
         return phraseRepository.findAll();
     }
+
+    public long getMaxId() {
+        return phraseRepository.getMaxId();
+    }
 }

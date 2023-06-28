@@ -82,4 +82,7 @@ public interface UserPhraseRepository extends JpaRepository<UserPhrase, Long> {
             "WHERE u.userId = :userId " +
             "AND p.phraseId = :phraseId")
     UserPhrase findUserPhraseByUserIdAndPhraseId(@Param("userId") Long userId, @Param("phraseId") Long phraseId);
+
+    @Query("SELECT MAX(up.userPhraseId) FROM UserPhrase up")
+    Long findMaxId();
 }
