@@ -305,6 +305,8 @@ public class ChatHandler {
             case PHRASE_LENGTH_DESC -> userPhraseService.findUserPhrasesByUserIdOrderByPhraseLengthDesc(chatId);
             case PHRASE_VIEWS_ASC -> userPhraseService.findUserPhrasesByIdOrderByCountPhraseViewsAsc(chatId);
             case PHRASE_VIEWS_DESC -> userPhraseService.findUserPhrasesByIdOrderByCountPhraseViewsDesc(chatId);
+            case ALPHABETICAL_ASC -> userPhraseService.findUserPhrasesByUserIdOrderByAlphabeticalAsc(chatId);
+            case ALPHABETICAL_DESC -> userPhraseService.findUserPhrasesByUserIdOrderByAlphabeticalDesc(chatId);
         };
     }
 

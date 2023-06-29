@@ -110,6 +110,11 @@ public class InlineKeyboardFactory {
                 createInlineKeyboardButton(messages.getString("button.date.descending"), "DATE_DESC_BUTTON")
         ));
 
+        inlineKeyboard.add(Arrays.asList(
+                createInlineKeyboardButton(messages.getString("button.alphabetical.ascending"), "ALPHABET_ASC_BUTTON"),
+                createInlineKeyboardButton(messages.getString("button.alphabetical.descending"), "ALPHABET_DESC_BUTTON")
+        ));
+
         inlineKeyboardMarkup.setKeyboard(inlineKeyboard);
         return inlineKeyboardMarkup;
     }
@@ -122,13 +127,13 @@ public class InlineKeyboardFactory {
         Document doc1 = htmlConnector.getDocFromUrl("https://dictionary.cambridge.org/dictionary/english/" + user.getCurrentPhrase());
         Elements elements = doc1.select(".ddef_h");
         if (elements.size() != 0) {
-            InlineKeyboardButton button1 = createInlineKeyboardButton("meanings", "ENGLISH_MEANINGS_BUTTON");
+            InlineKeyboardButton button1 = createInlineKeyboardButton("button.name.definitions", "ENGLISH_MEANINGS_BUTTON");
             inlineKeyboard.add(Collections.singletonList(button1));
         }
 
         Document doc = htmlConnector.getDocFromUrl("https://context.reverso.net/translation/english-russian/" + user.getCurrentPhrase());
         if (doc != null) {
-            InlineKeyboardButton button2 = createInlineKeyboardButton("english-russian sentences", "SENTENCES_BUTTON");
+            InlineKeyboardButton button2 = createInlineKeyboardButton("button.name.eng_rus_sentences", "SENTENCES_BUTTON");
             inlineKeyboard.add(Collections.singletonList(button2));
         }
 

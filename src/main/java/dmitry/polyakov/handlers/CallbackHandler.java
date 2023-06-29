@@ -109,7 +109,7 @@ public class CallbackHandler {
 
         if (currentPage < maxPage - 1) {
             user.setCurrentPageNumber(currentPage + 1);
-        } else if (maxPage > 0){
+        } else if (maxPage > 0) {
             user.setCurrentPageNumber(maxPage - 1);
         }
         userService.saveUser(user);
@@ -128,7 +128,7 @@ public class CallbackHandler {
 
         if (currentPage < maxPage - 10) {
             user.setCurrentPageNumber(currentPage + 10);
-        } else if (maxPage > 0){
+        } else if (maxPage > 0) {
             user.setCurrentPageNumber(maxPage - 1);
         }
 
@@ -206,12 +206,46 @@ public class CallbackHandler {
         User user = userService.findUserById(chatId);
 
         switch (callbackData) {
-            case "LEN_ASC_BUTTON" -> user.setPhraseSortingState(SettingsOrderEnum.PHRASE_LENGTH_ASC);
-            case "LEN_DESC_BUTTON" ->user.setPhraseSortingState(SettingsOrderEnum.PHRASE_LENGTH_DESC);
-            case "VIEWS_ASC_BUTTON" -> user.setPhraseSortingState(SettingsOrderEnum.PHRASE_VIEWS_ASC);
-            case "VIEWS_DESC_BUTTON" -> user.setPhraseSortingState(SettingsOrderEnum.PHRASE_VIEWS_DESC);
-            case "DATE_ASC_BUTTON" -> user.setPhraseSortingState(SettingsOrderEnum.PHRASE_ID_ASC);
-            case "DATE_DESC_BUTTON" -> user.setPhraseSortingState(SettingsOrderEnum.PHRASE_ID_DESC);
+            case "LEN_ASC_BUTTON" -> {
+                user.setPhraseSortingState(SettingsOrderEnum.PHRASE_LENGTH_ASC);
+
+                log.info("@" + userService.findUserById(chatId).getNickname() + " changed phrase sorting to descending order based on phrase length.");
+            }
+            case "LEN_DESC_BUTTON" -> {
+                user.setPhraseSortingState(SettingsOrderEnum.PHRASE_LENGTH_DESC);
+
+                log.info("@" + userService.findUserById(chatId).getNickname() + " changed phrase sorting to ascending order based on phrase length.");
+            }
+            case "VIEWS_ASC_BUTTON" -> {
+                user.setPhraseSortingState(SettingsOrderEnum.PHRASE_VIEWS_ASC);
+
+                log.info("@" + userService.findUserById(chatId).getNickname() + " changed phrase sorting to ascending order based on phrase views.");
+            }
+            case "VIEWS_DESC_BUTTON" -> {
+                user.setPhraseSortingState(SettingsOrderEnum.PHRASE_VIEWS_DESC);
+
+                log.info("@" + userService.findUserById(chatId).getNickname() + " changed phrase sorting to descending order based on phrase views.");
+            }
+            case "DATE_ASC_BUTTON" -> {
+                user.setPhraseSortingState(SettingsOrderEnum.PHRASE_ID_ASC);
+
+                log.info("@" + userService.findUserById(chatId).getNickname() + " changed phrase sorting to ascending order based on phrase adding date.");
+            }
+            case "DATE_DESC_BUTTON" -> {
+                user.setPhraseSortingState(SettingsOrderEnum.PHRASE_ID_DESC);
+
+                log.info("@" + userService.findUserById(chatId).getNickname() + " changed phrase sorting to descending order based on phrase adding date.");
+            }
+            case "ALPHABET_ASC_BUTTON" -> {
+                user.setPhraseSortingState(SettingsOrderEnum.ALPHABETICAL_ASC);
+
+                log.info("@" + userService.findUserById(chatId).getNickname() + "  changed phrase sorting to ascending order based on phrase first letter.");
+            }
+            case "ALPHABET_DESC_BUTTON" -> {
+                user.setPhraseSortingState(SettingsOrderEnum.ALPHABETICAL_DESC);
+
+                log.info("@" + userService.findUserById(chatId).getNickname() + "  changed phrase sorting to descending order based on phrase first letter.");
+            }
         }
 
         user.setCurrentPageNumber(0);

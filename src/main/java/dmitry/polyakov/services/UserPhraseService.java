@@ -40,13 +40,17 @@ public class UserPhraseService {
         return userPhraseRepository.findUserPhrasesByUserIdOrderByPhraseLengthDesc(userId);
     }
 
+    public LinkedList<String>findUserPhrasesByUserIdOrderByAlphabeticalAsc(Long userId) {
+        return userPhraseRepository.findUserPhrasesByUserIdOrderByPhraseAsc(userId);
+    }
+
+    public LinkedList<String>findUserPhrasesByUserIdOrderByAlphabeticalDesc(Long userId) {
+        return userPhraseRepository.findUserPhrasesByUserIdOrderByPhraseDesc(userId);
+    }
+
 
     public void saveUserPhrase(UserPhrase userPhrase) {
         userPhraseRepository.save(userPhrase);
-    }
-
-    public List<UserPhrase> findAllUsersPhrases() {
-        return userPhraseRepository.findAll();
     }
 
     public boolean findUserPhraseExists(Long userId, Long phraseId) {
