@@ -167,7 +167,8 @@ public class BotServiceImpl implements BotService {
 
             case "AMOUNT_BUTTON" -> callbackHandler.handleAmountButtonPressed(bot, chatId, messageId);
 
-            case "LEN_ASC_BUTTON", "LEN_DESC_BUTTON", "VIEWS_ASC_BUTTON", "VIEWS_DESC_BUTTON", "DATE_ASC_BUTTON", "DATE_DESC_BUTTON" -> {
+            case "LEN_ASC_BUTTON", "LEN_DESC_BUTTON", "VIEWS_ASC_BUTTON", "VIEWS_DESC_BUTTON", "DATE_ASC_BUTTON", "DATE_DESC_BUTTON",
+                    "ALPHABET_ASC_BUTTON", "ALPHABET_DESC_BUTTON"-> {
                 callbackHandler.handleOrderOptionButtonPressed(callBackData, chatId);
                 callbackHandler.handleCancelButtonPressed(update, bot, chatId, messageId);
             }

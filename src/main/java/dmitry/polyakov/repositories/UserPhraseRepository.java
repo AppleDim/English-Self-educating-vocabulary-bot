@@ -40,6 +40,14 @@ public interface UserPhraseRepository extends JpaRepository<UserPhrase, Long> {
             "JOIN up.user u " +
             "JOIN up.phrase p " +
             "WHERE u.userId = :userId " +
+            "ORDER BY p.phrase ASC")
+    LinkedList<String> findUserPhrasesByUserIdOrderByPhraseAsc(@Param("userId") Long userId);
+
+    @Query("SELECT up.phrase.phrase " +
+            "FROM UserPhrase up " +
+            "JOIN up.user u " +
+            "JOIN up.phrase p " +
+            "WHERE u.userId = :userId " +
             "ORDER BY p.phraseId DESC")
     LinkedList<String> findUserPhrasesByUserIdOrderByPhraseIdDesc(@Param("userId") Long userId);
 
@@ -58,6 +66,14 @@ public interface UserPhraseRepository extends JpaRepository<UserPhrase, Long> {
             "WHERE u.userId = :userId " +
             "ORDER BY up.countPhraseViews DESC")
     LinkedList<String> findUserPhrasesByUserIdOrderByCountPhraseViewsDesc(@Param("userId") Long userId);
+
+    @Query("SELECT up.phrase.phrase " +
+            "FROM UserPhrase up " +
+            "JOIN up.user u " +
+            "JOIN up.phrase p " +
+            "WHERE u.userId = :userId " +
+            "ORDER BY p.phrase DESC")
+    LinkedList<String> findUserPhrasesByUserIdOrderByPhraseDesc(@Param("userId") Long userId);
 
     boolean existsByUserUserIdAndPhrasePhraseId(Long userId, Long phraseId);
 
