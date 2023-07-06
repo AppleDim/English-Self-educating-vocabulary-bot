@@ -39,12 +39,12 @@ public class InlineKeyboardFactory {
                 createInlineKeyboardButton(EmojiParser.parseToUnicode(":twisted_rightwards_arrows:"), "ORDER_BUTTON");
         InlineKeyboardButton cancelButton =
                 createInlineKeyboardButton(EmojiParser.parseToUnicode(":house:"), "CANCEL_BUTTON");
-        InlineKeyboardButton amountButton =
-                createInlineKeyboardButton(EmojiParser.parseToUnicode(":arrows_clockwise:"), "AMOUNT_BUTTON");
+        InlineKeyboardButton numberButton =
+                createInlineKeyboardButton(EmojiParser.parseToUnicode(":arrows_clockwise:"), "NUMBER_BUTTON");
 
         row.add(orderButton);
         row.add(cancelButton);
-        row.add(amountButton);
+        row.add(numberButton);
 
         inlineKeyboard.add(row);
         inlineKeyboardMarkup.setKeyboard(inlineKeyboard);
@@ -120,6 +120,7 @@ public class InlineKeyboardFactory {
     }
 
     protected InlineKeyboardMarkup createEnglishInlineKeyboard(Long chatId) throws UserNotFoundException {
+        ResourceBundle messages = languageLocalisation.getMessages(chatId);
         User user = userService.findUserById(chatId);
         InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> inlineKeyboard = new ArrayList<>();
@@ -127,13 +128,13 @@ public class InlineKeyboardFactory {
         Document doc1 = htmlConnector.getDocFromUrl("https://dictionary.cambridge.org/dictionary/english/" + user.getCurrentPhrase());
         Elements elements = doc1.select(".ddef_h");
         if (elements.size() != 0) {
-            InlineKeyboardButton button1 = createInlineKeyboardButton("button.name.definitions", "ENGLISH_MEANINGS_BUTTON");
+            InlineKeyboardButton button1 = createInlineKeyboardButton(messages.getString("button.name.definitions"), "ENGLISH_MEANINGS_BUTTON");
             inlineKeyboard.add(Collections.singletonList(button1));
         }
 
         Document doc = htmlConnector.getDocFromUrl("https://context.reverso.net/translation/english-russian/" + user.getCurrentPhrase());
         if (doc != null) {
-            InlineKeyboardButton button2 = createInlineKeyboardButton("button.name.eng_rus_sentences", "SENTENCES_BUTTON");
+            InlineKeyboardButton button2 = createInlineKeyboardButton(messages.getString("button.name.eng_rus_sentences"), "SENTENCES_BUTTON");
             inlineKeyboard.add(Collections.singletonList(button2));
         }
 

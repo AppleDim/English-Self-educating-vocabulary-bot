@@ -147,9 +147,9 @@ public class ChatHandler {
         return sendMessage;
     }
 
-    protected SendMessage createSettingsAmountMessage(long chatId) {
+    protected SendMessage createSettingsNumberMessage(long chatId) {
         ResourceBundle messages = languageLocalisation.getMessages(chatId);
-        return createTextSendMessage(chatId, messages.getString("settings.options.amount"));
+        return createTextSendMessage(chatId, messages.getString("settings.options.number"));
     }
 
     protected SendMessage createTextSendMessage(Long chatId, String text) {
@@ -241,7 +241,7 @@ public class ChatHandler {
             }
 
             case "/help" -> {
-                return messages.getString("message.helping");
+                return EmojiParser.parseToUnicode(messages.getString("message.helping"));
             }
             case "/write" -> {
                 return messages.getString("message.writing");
@@ -273,6 +273,9 @@ public class ChatHandler {
             case "/invalid_number_entered" -> {
                 return messages.getString("settings.invalid_number");
             }
+            case "/enter_phrase_to_search" -> {
+                return (messages.getString("message.phrase.search"));
+            }
         }
         return "";
     }
@@ -287,6 +290,7 @@ public class ChatHandler {
         user.setNickname(chat.getUserName());
         user.setRegisteredDate(new Timestamp(System.currentTimeMillis()));
         user.setUserBotState(BotStateEnum.DEFAULT_STATE);
+        user.setLanguage("en");
         user.setCurrentPageNumber(0);
         user.setPhraseSortingState(SettingsOrderEnum.PHRASE_ID_ASC);
         user.setPhrasesPerPage(10);

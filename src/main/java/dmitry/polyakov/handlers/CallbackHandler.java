@@ -93,11 +93,13 @@ public class CallbackHandler {
         log.info("@" + userService.findUserById(chatId).getNickname() + " returned to the main menu");
     }
 
-    public void handleSearchingButtonPressed(Update update, PersonalVocabularyBot bot, long chatId) throws UserNotFoundException {
+    public void handleSearchingButtonPressed(Update update, PersonalVocabularyBot bot, long chatId, int messageId) throws UserNotFoundException, TelegramApiException {
+        chatHandler.deleteMessage(bot, chatId, messageId);
         User user = userService.findUserById(chatId);
-        user.setUserBotState(BotStateEnum.SETTINGS);
+        user.setUserBotState(BotStateEnum.SEARCHING_PHRASE);
         userService.saveUser(user);
-        chatHandler.sendPhrasesPage(bot, chatId);
+
+        chatHandler.sendMessage(update, chatId, bot, "/enter_phrase_to_search");
     }
 
     public void handleForwardButtonPressed(PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException {
@@ -173,7 +175,7 @@ public class CallbackHandler {
         user.setUserBotState(BotStateEnum.READING_DICTIONARY);
         userService.saveUser(user);
 
-        log.info("@" + userService.findUserById(chatId).getNickname() + " canceled delete of phrase");
+        log.info("@" + userService.findUserById(chatId).getNickname() + " canceled deleting a phrase");
     }
 
     public void handleOrderButtonPressed(PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException {
@@ -186,20 +188,20 @@ public class CallbackHandler {
         SendMessage sendMessage = chatHandler.createSettingsOrderMessage(chatId);
         chatHandler.executeMessage(bot, sendMessage);
 
-        log.info("@" + userService.findUserById(chatId).getNickname() + " pressed order button");
+        log.info("@" + userService.findUserById(chatId).getNickname() + " pressed the order button");
     }
 
-    public void handleAmountButtonPressed(PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException {
+    public void handleNumberButtonPressed(PersonalVocabularyBot bot, Long chatId, int messageId) throws UserNotFoundException {
         chatHandler.deleteMessage(bot, chatId, messageId);
 
         User user = userService.findUserById(chatId);
-        user.setUserBotState(BotStateEnum.SETTINGS_AMOUNT);
+        user.setUserBotState(BotStateEnum.SETTINGS_NUMBER);
         userService.saveUser(user);
 
-        SendMessage sendMessage = chatHandler.createSettingsAmountMessage(chatId);
+        SendMessage sendMessage = chatHandler.createSettingsNumberMessage(chatId);
         chatHandler.executeMessage(bot, sendMessage);
 
-        log.info("@" + userService.findUserById(chatId).getNickname() + " pressed amount button");
+        log.info("@" + userService.findUserById(chatId).getNickname() + " pressed the number button");
     }
 
     public void handleOrderOptionButtonPressed(String callbackData, Long chatId) throws UserNotFoundException {

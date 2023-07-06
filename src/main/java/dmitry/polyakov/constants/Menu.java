@@ -9,9 +9,9 @@ public class Menu {
 
     public static List<BotCommand> addBotCommands() {
         return List.of(
-                new BotCommand("/start", "Initiate the bot commence"),
-                new BotCommand("/help", "Show the helping page"),
-                new BotCommand("/language", "Change bot language")
+                new BotCommand("/start", "Initiate the bot commencement"),
+                new BotCommand("/help", "Get the helping page"),
+                new BotCommand("/language", "Change the language of the bot")
         );
     }
 }

@@ -60,7 +60,10 @@ public class ReplyKeyboardFactory {
                 + ":writing:"));
         KeyboardButton dictionaryButton = new KeyboardButton(EmojiParser.parseToUnicode(messages.getString("button.name.dictionary")
                 + ":scroll:"));
+        KeyboardButton helpButton = new KeyboardButton(EmojiParser.parseToUnicode(messages.getString("button.name.help")
+                + ":open_book:"));
         row.add(writeButton);
+        row.add(helpButton);
         row.add(dictionaryButton);
         keyboardRows.add(row);
 

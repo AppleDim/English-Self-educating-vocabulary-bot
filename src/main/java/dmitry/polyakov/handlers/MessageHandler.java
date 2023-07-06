@@ -121,15 +121,21 @@ public class MessageHandler {
         if (text.equals(languageLocalisation.englishLang)) {
             user.setLanguage("en");
             languageLocalisation.setMessages(chatId, ResourceBundle.getBundle("messages", new Locale("en")));
+
+            log.info("@" + userService.findUserById(chatId).getNickname() + " changed the language to English");
+
         } else if (text.equals(languageLocalisation.russianLang)) {
             user.setLanguage("ru");
             languageLocalisation.setMessages(chatId, ResourceBundle.getBundle("messages", new Locale("ru")));
+
+            log.info("@" + userService.findUserById(chatId).getNickname() + " changed the language to Russian");
         }
 
         executeSendingMessage(update, chatId, bot, "/lang");
 
         user.setUserBotState(DEFAULT_STATE);
         userService.saveUser(user);
+
     }
 
     public void deletePhrase(PersonalVocabularyBot bot, Long chatId) throws UserNotFoundException, TelegramApiException {
@@ -145,6 +151,8 @@ public class MessageHandler {
         userService.saveUser(user);
 
         handleDictionaryCommandReceived(chatId, bot);
+
+        log.info("@" + userService.findUserById(chatId).getNickname() + " deleted a phrase " + phraseText);
     }
 
     public void handlePhrasesNumberReceived(Update update, PersonalVocabularyBot bot, Long chatId, String text) throws UserNotFoundException {
@@ -155,10 +163,12 @@ public class MessageHandler {
                 user.setCurrentPageNumber(0);
                 executeSendingMessage(update, chatId, bot, "/number_saved");
                 userService.saveUser(user);
+
                 log.info("@" + userService.findUserById(user.getUserId()).getNickname() + " entered a number for displaying phrases per page: " + text);
             }
         } catch (NumberFormatException e) {
             executeSendingMessage(update, chatId, bot, "/invalid_number_entered");
+
             log.warn("@" + userService.findUserById(user.getUserId()).getNickname() + " entered an invalid number.");
         }
     }
@@ -188,6 +198,45 @@ public class MessageHandler {
 
         log.info("@" + user.getNickname() + " opened the page with sentences with " + phrase);
     }
+
+    public void handlePartOfPhraseReceived(Update update, PersonalVocabularyBot bot, Long chatId) throws UserNotFoundException {
+        LinkedList<String> userPhrases = userPhraseService.findUserPhrasesByUserIdOrderByAlphabeticalAsc(chatId);
+        User user = userService.findUserById(chatId);
+        Set<String> phrases = new HashSet<>();
+        String text = update.getMessage().getText();
+        SendMessage sendMessage = new SendMessage();
+        sendMessage.setChatId(String.valueOf(chatId));
+        if (text.length() < 3) {
+            sendMessage.setText("The length of the provided part should be greater than 3.");
+
+            log.warn("@" + user.getNickname() + " entered the part which is too short: \"" + text + "\"");
+        }
+
+        else {
+            for (String userPhrase : userPhrases) {
+                if (userPhrase.toLowerCase().contains(text.toLowerCase())) {
+                    phrases.add(userPhrase);
+                }
+            }
+            if (phrases.isEmpty()) {
+                sendMessage.setText("No phrases contain this provided part.");
+            } else {
+                StringBuilder sb = new StringBuilder();
+                for (int i = 0; i < phrases.size(); i++) {
+                    if (i != phrases.size() - 1) {
+                        sb.append(phrases.stream().toList().get(i)).append(", ");
+                    } else {
+                        sb.append(phrases.stream().toList().get(i));
+                    }
+                }
+                sendMessage.setText(sb.toString());
+            }
+
+            log.info("@" + user.getNickname() + " searched for phrases that contain \"" + text + "\"");
+        }
+        chatHandler.executeMessage(bot, sendMessage);
+    }
+
     private void executeSendingMessage(Update update, Long chatId, PersonalVocabularyBot bot, String text) {
         try {
             chatHandler.sendMessage(update, chatId, bot, text);

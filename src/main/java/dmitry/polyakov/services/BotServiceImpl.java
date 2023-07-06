@@ -49,7 +49,7 @@ public class BotServiceImpl implements BotService {
             try {
                 handleMessages(update, chatId, text, bot);
             } catch (UserNotFoundException e) {
-                log.warn("Error finding user with id = " + chatId, e);
+                log.warn("Error finding the user with id = " + chatId, e);
             } catch (PhraseNotFoundException e) {
                 log.warn("Error fetching the phrase with this context: " + text, e);
             } catch (TelegramApiException e) {
@@ -61,7 +61,7 @@ public class BotServiceImpl implements BotService {
             } catch (TelegramApiException e) {
                 log.warn("Unexpected error has occurred while processing", e);
             } catch (UserNotFoundException e) {
-                log.warn("Error finding user with id = " + update.getMessage().getChatId(), e);
+                log.warn("Error finding the user with id = " + update.getMessage().getChatId(), e);
             }
 
         }
@@ -80,6 +80,10 @@ public class BotServiceImpl implements BotService {
             user.setUserBotState(DEFAULT_STATE);
             userService.saveUser(user);
 
+            commandHandler.handleHelpCommandReceived(update, chatId, bot);
+
+        } else if (command.equals(EmojiParser.parseToUnicode(messages.getString("button.name.help") + ":open_book:"))
+                && user.getUserBotState().equals(DEFAULT_STATE)) {
             commandHandler.handleHelpCommandReceived(update, chatId, bot);
 
         } else if (command.equals(EmojiParser.parseToUnicode(messages.getString("button.name.dictionary")
@@ -118,9 +122,11 @@ public class BotServiceImpl implements BotService {
         } else if (user.getUserBotState().equals(WRITING_WORDS)) {
             commandHandler.handlePhraseReceived(update, chatId, command, bot);
 
-        } else if (user.getUserBotState().equals(SETTINGS_AMOUNT)) {
+        } else if (user.getUserBotState().equals(SETTINGS_NUMBER)) {
             commandHandler.handlePhrasesNumberReceived(update, bot, chatId, command);
             callbackHandler.handleReturnToMenu(update, bot, chatId);
+        } else if (user.getUserBotState().equals(SEARCHING_PHRASE)) {
+            commandHandler.handlePartOfPhraseReceived(update, bot, chatId);
         }
     }
 
@@ -147,8 +153,8 @@ public class BotServiceImpl implements BotService {
                     callbackHandler.handleCancelButtonPressed(update, bot, chatId, messageId);
             }
 
-            case "SEARCHING_BUTTON" -> {
-            }
+            case "SEARCHING_BUTTON" -> callbackHandler.handleSearchingButtonPressed(update, bot, chatId, messageId);
+            
 
             case "FORWARD_BUTTON" -> callbackHandler.handleForwardButtonPressed(bot, chatId, messageId);
 
@@ -165,10 +171,10 @@ public class BotServiceImpl implements BotService {
 
             case "ORDER_BUTTON" -> callbackHandler.handleOrderButtonPressed(bot, chatId, messageId);
 
-            case "AMOUNT_BUTTON" -> callbackHandler.handleAmountButtonPressed(bot, chatId, messageId);
+            case "NUMBER_BUTTON" -> callbackHandler.handleNumberButtonPressed(bot, chatId, messageId);
 
             case "LEN_ASC_BUTTON", "LEN_DESC_BUTTON", "VIEWS_ASC_BUTTON", "VIEWS_DESC_BUTTON", "DATE_ASC_BUTTON", "DATE_DESC_BUTTON",
-                    "ALPHABET_ASC_BUTTON", "ALPHABET_DESC_BUTTON"-> {
+                    "ALPHABET_ASC_BUTTON", "ALPHABET_DESC_BUTTON" -> {
                 callbackHandler.handleOrderOptionButtonPressed(callBackData, chatId);
                 callbackHandler.handleCancelButtonPressed(update, bot, chatId, messageId);
             }
